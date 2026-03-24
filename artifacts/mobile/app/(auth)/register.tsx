@@ -44,17 +44,22 @@ export default function RegisterScreen() {
     }
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const { error } = await register(email, password, name);
+    const { error, needsConfirmation } = await register(email, password, name);
     setLoading(false);
     if (error) {
       Alert.alert("Помилка реєстрації", translateError(error));
-    } else {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (needsConfirmation) {
+      // Email confirmation required — tell the user to check their inbox
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert(
-        "Акаунт створено! 🎉",
-        "Перевірте email для підтвердження, потім увійдіть",
+        "Перевірте пошту 📧",
+        `Ми надіслали листа на ${email}.\n\nПідтвердіть реєстрацію, перейшовши за посиланням у листі, а потім увійдіть.`,
         [{ text: "Увійти", onPress: () => router.replace("/(auth)/login") }]
       );
+    } else {
+      // Auto-logged in — keep loading=true so screen doesn't flicker before AuthGuard redirects
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setLoading(true); // will unmount when redirected
     }
   };
 

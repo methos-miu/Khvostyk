@@ -16,7 +16,7 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ error?: string }>;
-  register: (email: string, password: string, name: string) => Promise<{ error?: string }>;
+  register: (email: string, password: string, name: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   logout: () => Promise<void>;
   forgotPassword: (email: string) => Promise<{ error?: string }>;
   updateProfile: (updates: Partial<Pick<UserProfile, "name" | "avatar_url">>) => Promise<void>;
@@ -76,11 +76,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       options: { data: { name } },
     });
     if (error) return { error: error.message };
-    // Update name in users table
+
+    // Save name to profile (fire-and-forget; may fail if confirmation pending)
     if (data.user) {
-      await supabase.from("users").upsert({ id: data.user.id, email: email.trim(), name });
+      supabase.from("users")
+        .upsert({ id: data.user.id, email: email.trim(), name })
+        .then(() => {}).catch(() => {});
     }
-    return {};
+
+    // If Supabase returned a session, email confirmation is disabled → already signed in
+    if (data.session) {
+      return { needsConfirmation: false };
+    }
+
+    // Try to sign in immediately (works when email confirmation is disabled)
+    const { error: loginError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+
+    if (!loginError) {
+      return { needsConfirmation: false };
+    }
+
+    // Email confirmation is required — user must click the link first
+    return { needsConfirmation: true };
   }, []);
 
   const logout = useCallback(async () => {
