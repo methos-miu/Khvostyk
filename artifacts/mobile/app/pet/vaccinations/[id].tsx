@@ -5,7 +5,6 @@ import React, { useLayoutEffect } from "react";
 import {
   Alert,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -17,19 +16,21 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { VaccinationBadge } from "@/components/ui/VaccinationBadge";
 import { Colors } from "@/constants/colors";
 import { usePets, Vaccination } from "@/context/PetsContext";
-import { formatDate, getVaccinationStatus } from "@/utils/notifications";
+import { useLanguage } from "@/context/LanguageContext";
+import { formatDate } from "@/utils/notifications";
 
 export default function VaccinationsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPet, deleteVaccination } = usePets();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { t, language } = useLanguage();
 
   const pet = getPet(id);
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: `Вакцинації • ${pet?.name ?? ""}`,
+      title: `${t.vaccinations} • ${pet?.name ?? ""}`,
       headerRight: () => (
         <Pressable
           onPress={() => {
@@ -42,12 +43,12 @@ export default function VaccinationsScreen() {
         </Pressable>
       ),
     });
-  }, [pet, navigation, id]);
+  }, [pet, navigation, id, t]);
 
   if (!pet) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundText}>Тварину не знайдено</Text>
+        <Text style={styles.notFoundText}>{t.notFound}</Text>
       </View>
     );
   }
@@ -57,18 +58,16 @@ export default function VaccinationsScreen() {
   );
 
   function VaccinationItem({ item, index }: { item: Vaccination; index: number }) {
-    const status = getVaccinationStatus(item.nextDate);
     const statusColors = {
       overdue: Colors.danger,
       soon: Colors.warning,
       upcoming: Colors.accentGreen,
       ok: Colors.primary,
-    }[status];
+    };
 
     return (
       <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
         <View style={styles.vaccinationCard}>
-          <View style={[styles.statusStrip, { backgroundColor: statusColors }]} />
           <View style={styles.vaccinationContent}>
             <View style={styles.vaccinationHeader}>
               <View style={styles.vaccinationTitleArea}>
@@ -79,12 +78,12 @@ export default function VaccinationsScreen() {
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   Alert.alert(
-                    `Видалити "${item.name}"?`,
-                    "Вакцинацію буде видалено безповоротно.",
+                    t.deleteVaccination,
+                    t.deleteVaccinationConfirm,
                     [
-                      { text: "Скасувати", style: "cancel" },
+                      { text: t.cancel, style: "cancel" },
                       {
-                        text: "Видалити",
+                        text: t.delete,
                         style: "destructive",
                         onPress: () => deleteVaccination(pet.id, item.id),
                       },
@@ -101,7 +100,7 @@ export default function VaccinationsScreen() {
               <View style={styles.dateItem}>
                 <Ionicons name="checkmark-circle" size={14} color={Colors.accentGreen} />
                 <View>
-                  <Text style={styles.dateLabel}>Зроблено</Text>
+                  <Text style={styles.dateLabel}>{t.done}</Text>
                   <Text style={styles.dateValue}>{formatDate(item.date)}</Text>
                 </View>
               </View>
@@ -109,7 +108,7 @@ export default function VaccinationsScreen() {
               <View style={styles.dateItem}>
                 <Ionicons name="arrow-forward-circle" size={14} color={Colors.primary} />
                 <View>
-                  <Text style={styles.dateLabel}>Наступна</Text>
+                  <Text style={styles.dateLabel}>{t.next}</Text>
                   <Text style={styles.dateValue}>{formatDate(item.nextDate)}</Text>
                 </View>
               </View>
@@ -138,24 +137,19 @@ export default function VaccinationsScreen() {
           <View style={styles.emptyIcon}>
             <Ionicons name="medical-outline" size={40} color={Colors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>Немає вакцинацій</Text>
-          <Text style={styles.emptySubtitle}>Додайте першу вакцинацію для {pet.name}</Text>
-          <Pressable
-            onPress={() => router.push({ pathname: "/pet/add-vaccination/[id]", params: { id } })}
-            style={styles.emptyButton}
-          >
-            <Text style={styles.emptyButtonText}>Додати вакцинацію</Text>
-          </Pressable>
+          <Text style={styles.emptyTitle}>{t.noVaccinations}</Text>
+          <Text style={styles.emptySubtitle}>
+            {language === "uk"
+              ? `Додайте першу вакцинацію для ${pet.name}`
+              : `Add the first vaccination for ${pet.name}`}
+          </Text>
         </View>
       ) : (
         <FlatList
           data={sorted}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => <VaccinationItem item={item} index={index} />}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + 24 },
-          ]}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
         />
       )}
@@ -164,143 +158,39 @@ export default function VaccinationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notFoundText: {
-    fontSize: 16,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  listContent: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  notFoundText: { fontSize: 16, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  listContent: { padding: 16 },
   vaccinationCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    marginBottom: 12,
-    flexDirection: "row",
+    backgroundColor: Colors.surface, borderRadius: 18, marginBottom: 12,
     overflow: "hidden",
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1, shadowRadius: 14, elevation: 4,
   },
-  statusStrip: {
-    width: 4,
-  },
-  vaccinationContent: {
-    flex: 1,
-    padding: 14,
-    gap: 10,
-  },
-  vaccinationHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-  },
-  vaccinationTitleArea: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flexWrap: "wrap",
-  },
-  vaccinationName: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
-  },
-  datesRow: {
-    flexDirection: "row",
-    gap: 14,
-    alignItems: "flex-start",
-  },
-  dateItem: {
-    flexDirection: "row",
-    gap: 8,
-    alignItems: "flex-start",
-    flex: 1,
-  },
-  dateSep: {
-    width: 1,
-    height: 36,
-    backgroundColor: Colors.border,
-  },
-  dateLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textTertiary,
-  },
-  dateValue: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
-    marginTop: 1,
-  },
-  vetRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  vetText: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
+  vaccinationContent: { padding: 16, gap: 12 },
+  vaccinationHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  vaccinationTitleArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  vaccinationName: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  datesRow: { flexDirection: "row", gap: 14, alignItems: "flex-start" },
+  dateItem: { flexDirection: "row", gap: 8, alignItems: "flex-start", flex: 1 },
+  dateSep: { width: 1, height: 36, backgroundColor: Colors.border },
+  dateLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: Colors.textTertiary },
+  dateValue: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.text, marginTop: 1 },
+  vetRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  vetText: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
   notes: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    lineHeight: 18,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    padding: 10,
+    fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, lineHeight: 18,
+    backgroundColor: Colors.background, borderRadius: 10, padding: 10,
   },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 40,
-  },
+  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
   emptyIcon: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center", marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    marginBottom: 8,
-  },
+  emptyTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text, marginBottom: 8 },
   emptySubtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    marginBottom: 24,
-  },
-  emptyButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 28,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  emptyButtonText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textLight,
+    fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary,
+    textAlign: "center", marginBottom: 8, lineHeight: 20,
   },
 });

@@ -7,7 +7,21 @@ import React, {
   useState,
 } from "react";
 
-export type Species = "cat" | "dog" | "other";
+export type Species =
+  | "cat"
+  | "dog"
+  | "rabbit"
+  | "hamster"
+  | "guinea_pig"
+  | "bird"
+  | "turtle"
+  | "reptile"
+  | "fish"
+  | "ferret"
+  | "hedgehog"
+  | "other";
+
+export type Gender = "male" | "female" | null;
 
 export interface Vaccination {
   id: string;
@@ -36,6 +50,7 @@ export interface Pet {
   weight: string;
   photoUri?: string;
   color?: string;
+  gender?: Gender;
   vaccinations: Vaccination[];
   documents: Document[];
   createdAt: string;
@@ -74,9 +89,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   const loadPets = async () => {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
-      if (data) {
-        setPets(JSON.parse(data));
-      }
+      if (data) setPets(JSON.parse(data));
     } catch (e) {
       console.error("Failed to load pets", e);
     } finally {
@@ -129,11 +142,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
   const addVaccination = useCallback(
     async (petId: string, vaccination: Omit<Vaccination, "id">) => {
-      const newVaccination: Vaccination = { ...vaccination, id: generateId() };
+      const newV: Vaccination = { ...vaccination, id: generateId() };
       const updated = pets.map((p) =>
-        p.id === petId
-          ? { ...p, vaccinations: [...p.vaccinations, newVaccination] }
-          : p
+        p.id === petId ? { ...p, vaccinations: [...p.vaccinations, newV] } : p
       );
       setPets(updated);
       await savePets(updated);
@@ -145,12 +156,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     async (petId: string, vaccinationId: string, updates: Partial<Vaccination>) => {
       const updated = pets.map((p) =>
         p.id === petId
-          ? {
-              ...p,
-              vaccinations: p.vaccinations.map((v) =>
-                v.id === vaccinationId ? { ...v, ...updates } : v
-              ),
-            }
+          ? { ...p, vaccinations: p.vaccinations.map((v) => v.id === vaccinationId ? { ...v, ...updates } : v) }
           : p
       );
       setPets(updated);
@@ -174,11 +180,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
   const addDocument = useCallback(
     async (petId: string, document: Omit<Document, "id">) => {
-      const newDocument: Document = { ...document, id: generateId() };
+      const newDoc: Document = { ...document, id: generateId() };
       const updated = pets.map((p) =>
-        p.id === petId
-          ? { ...p, documents: [...p.documents, newDocument] }
-          : p
+        p.id === petId ? { ...p, documents: [...p.documents, newDoc] } : p
       );
       setPets(updated);
       await savePets(updated);

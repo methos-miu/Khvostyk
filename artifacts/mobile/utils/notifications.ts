@@ -25,12 +25,11 @@ export async function scheduleVaccinationReminder(
 ): Promise<string | null> {
   if (Platform.OS === "web") return null;
   try {
-    const nextDate = new Date(vaccination.nextDate);
+    const nextDate = parseDate(vaccination.nextDate);
+    if (!nextDate) return null;
     const reminderDate = new Date(nextDate);
     reminderDate.setDate(reminderDate.getDate() - 7);
-
     if (reminderDate <= new Date()) return null;
-
     const id = await Notifications.scheduleNotificationAsync({
       content: {
         title: "Нагадування про вакцинацію",
@@ -61,7 +60,8 @@ export async function cancelVaccinationReminder(notificationId: string): Promise
 
 export function getDaysUntilVaccination(nextDate: string): number {
   const now = new Date();
-  const next = new Date(nextDate);
+  const next = parseDate(nextDate);
+  if (!next) return 999;
   const diff = next.getTime() - now.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
 }
@@ -74,8 +74,64 @@ export function getVaccinationStatus(nextDate: string): "overdue" | "soon" | "up
   return "ok";
 }
 
+/**
+ * Parses a date string in DD-MM-YYYY or YYYY-MM-DD format.
+ * Returns null for invalid dates.
+ */
+export function parseDate(dateString: string): Date | null {
+  if (!dateString || typeof dateString !== "string") return null;
+  const trimmed = dateString.trim();
+
+  // Try DD-MM-YYYY (primary format)
+  const dmyMatch = trimmed.match(/^(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})$/);
+  if (dmyMatch) {
+    const day = parseInt(dmyMatch[1], 10);
+    const month = parseInt(dmyMatch[2], 10) - 1;
+    const year = parseInt(dmyMatch[3], 10);
+    const d = new Date(year, month, day);
+    if (
+      d.getFullYear() === year &&
+      d.getMonth() === month &&
+      d.getDate() === day &&
+      year >= 1900 &&
+      year <= 2100
+    ) return d;
+  }
+
+  // Try YYYY-MM-DD (ISO format, used internally)
+  const isoMatch = trimmed.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})$/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1], 10);
+    const month = parseInt(isoMatch[2], 10) - 1;
+    const day = parseInt(isoMatch[3], 10);
+    const d = new Date(year, month, day);
+    if (
+      d.getFullYear() === year &&
+      d.getMonth() === month &&
+      d.getDate() === day &&
+      year >= 1900 &&
+      year <= 2100
+    ) return d;
+  }
+
+  return null;
+}
+
+/**
+ * Converts user input DD-MM-YYYY to ISO YYYY-MM-DD for storage
+ */
+export function toISODate(input: string): string | null {
+  const d = parseDate(input);
+  if (!d) return null;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function formatDate(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseDate(dateString);
+  if (!date) return dateString || "—";
   return date.toLocaleDateString("uk-UA", {
     day: "numeric",
     month: "long",
@@ -84,7 +140,8 @@ export function formatDate(dateString: string): string {
 }
 
 export function formatDateShort(dateString: string): string {
-  const date = new Date(dateString);
+  const date = parseDate(dateString);
+  if (!date) return dateString || "—";
   return date.toLocaleDateString("uk-UA", {
     day: "2-digit",
     month: "2-digit",
@@ -92,19 +149,33 @@ export function formatDateShort(dateString: string): string {
   });
 }
 
-export function calculateAge(birthdate: string): string {
-  const birth = new Date(birthdate);
+export function calculateAge(
+  birthdate: string,
+  lang: "uk" | "en" = "uk"
+): string {
+  const birth = parseDate(birthdate);
+  if (!birth) return "—";
+
   const now = new Date();
   const years = now.getFullYear() - birth.getFullYear();
   const months = now.getMonth() - birth.getMonth();
 
+  if (years < 0) return "—";
+
   if (years === 0) {
     const m = months < 0 ? months + 12 : months;
-    if (m === 0) return "Менше місяця";
-    return `${m} міс.`;
+    if (m === 0) return lang === "uk" ? "< 1 міс." : "< 1 mo.";
+    return lang === "uk" ? `${m} міс.` : `${m} mo.`;
   }
 
   const adjustedYears = months < 0 ? years - 1 : years;
+  if (adjustedYears <= 0) {
+    const m = (months < 0 ? months + 12 : months);
+    return lang === "uk" ? `${m} міс.` : `${m} mo.`;
+  }
+
+  if (lang === "en") return adjustedYears === 1 ? "1 year" : `${adjustedYears} years`;
+
   if (adjustedYears === 1) return "1 рік";
   if (adjustedYears >= 2 && adjustedYears <= 4) return `${adjustedYears} роки`;
   return `${adjustedYears} років`;

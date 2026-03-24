@@ -1,12 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
+import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect } from "react";
 import {
   Alert,
   FlatList,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
 import { usePets, Document } from "@/context/PetsContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { formatDate } from "@/utils/notifications";
 
 function getDocumentIcon(type: string): { name: string; color: string; bg: string } {
@@ -38,18 +39,58 @@ export default function DocumentsScreen() {
   const { getPet, addDocument, deleteDocument } = usePets();
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { t, language } = useLanguage();
 
   const pet = getPet(id);
 
-  const pickDocument = async () => {
+  const saveImageAsDocument = async (uri: string, fileName: string) => {
+    await addDocument(id, {
+      name: fileName,
+      uri,
+      type: "image/jpeg",
+      date: new Date().toISOString(),
+    });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const takePhoto = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(t.permissionTitle, t.cameraDenied);
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      quality: 0.85,
+      allowsEditing: false,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const timestamp = new Date().toLocaleDateString(language === "uk" ? "uk-UA" : "en-GB");
+      await saveImageAsDocument(result.assets[0].uri, `${language === "uk" ? "Фото" : "Photo"} ${timestamp}.jpg`);
+    }
+  };
+
+  const pickFromGallery = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: "images",
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const timestamp = new Date().toLocaleDateString(language === "uk" ? "uk-UA" : "en-GB");
+      await saveImageAsDocument(result.assets[0].uri, `${language === "uk" ? "Зображення" : "Image"} ${timestamp}.jpg`);
+    }
+  };
+
+  const pickFromFiles = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ["application/pdf", "image/*", "application/msword",
-               "application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+        type: [
+          "application/pdf", "image/*",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ],
         copyToCacheDirectory: true,
         multiple: false,
       });
-
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         await addDocument(id, {
@@ -62,31 +103,42 @@ export default function DocumentsScreen() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch (e) {
-      Alert.alert("Помилка", "Не вдалося завантажити документ");
+      Alert.alert("", language === "uk" ? "Не вдалося завантажити документ" : "Could not load document");
     }
+  };
+
+  const showAddOptions = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      t.addDocument,
+      "",
+      [
+        { text: t.docTakePhoto, onPress: takePhoto },
+        { text: t.docGallery, onPress: pickFromGallery },
+        { text: t.docFiles, onPress: pickFromFiles },
+        { text: t.cancel, style: "cancel" },
+      ]
+    );
   };
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      title: `Документи • ${pet?.name ?? ""}`,
+      title: `${t.documents} • ${pet?.name ?? ""}`,
       headerRight: () => (
         <Pressable
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            pickDocument();
-          }}
+          onPress={showAddOptions}
           style={{ marginRight: 4 }}
         >
           <Ionicons name="add" size={26} color={Colors.primary} />
         </Pressable>
       ),
     });
-  }, [pet, navigation]);
+  }, [pet, navigation, t, language]);
 
   if (!pet) {
     return (
       <View style={styles.center}>
-        <Text style={styles.notFoundText}>Тварину не знайдено</Text>
+        <Text style={styles.notFoundText}>{t.notFound}</Text>
       </View>
     );
   }
@@ -116,12 +168,12 @@ export default function DocumentsScreen() {
             onPress={() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               Alert.alert(
-                `Видалити "${item.name}"?`,
-                "Документ буде видалено зі списку.",
+                t.deleteDoc,
+                t.deleteDocConfirm,
                 [
-                  { text: "Скасувати", style: "cancel" },
+                  { text: t.cancel, style: "cancel" },
                   {
-                    text: "Видалити",
+                    text: t.delete,
                     style: "destructive",
                     onPress: () => deleteDocument(pet.id, item.id),
                   },
@@ -144,13 +196,15 @@ export default function DocumentsScreen() {
           <View style={styles.emptyIcon}>
             <Ionicons name="folder-open-outline" size={44} color={Colors.primary} />
           </View>
-          <Text style={styles.emptyTitle}>Немає документів</Text>
+          <Text style={styles.emptyTitle}>{t.noDocuments}</Text>
           <Text style={styles.emptySubtitle}>
-            Збережіть ветеринарні документи, паспорти і результати аналізів для {pet.name}
+            {language === "uk"
+              ? `Збережіть ветеринарні документи, паспорти і результати аналізів для ${pet.name}`
+              : `Save vet documents, passports and test results for ${pet.name}`}
           </Text>
-          <Pressable onPress={pickDocument} style={styles.emptyButton}>
+          <Pressable onPress={showAddOptions} style={styles.emptyButton}>
             <Ionicons name="cloud-upload-outline" size={18} color={Colors.textLight} />
-            <Text style={styles.emptyButtonText}>Додати документ</Text>
+            <Text style={styles.emptyButtonText}>{t.addDocument}</Text>
           </Pressable>
         </View>
       ) : (
@@ -158,17 +212,12 @@ export default function DocumentsScreen() {
           data={pet.documents}
           keyExtractor={(item) => item.id}
           renderItem={({ item, index }) => <DocumentItem item={item} index={index} />}
-          contentContainerStyle={[
-            styles.listContent,
-            { paddingBottom: insets.bottom + 24 },
-          ]}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
           ListHeaderComponent={
             <View style={styles.storageInfo}>
               <Ionicons name="folder" size={16} color={Colors.primary} />
-              <Text style={styles.storageText}>
-                {pet.documents.length} документів збережено
-              </Text>
+              <Text style={styles.storageText}>{t.docCount(pet.documents.length)}</Text>
             </View>
           }
         />
@@ -178,128 +227,41 @@ export default function DocumentsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.background,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notFoundText: {
-    fontSize: 16,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  listContent: {
-    padding: 16,
-  },
+  container: { flex: 1, backgroundColor: Colors.background },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  notFoundText: { fontSize: 16, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  listContent: { padding: 16 },
   storageInfo: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 14,
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 10,
-    padding: 10,
+    flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 14,
+    backgroundColor: Colors.primaryLight, borderRadius: 12, padding: 10,
   },
-  storageText: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: Colors.primary,
-  },
+  storageText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.primary },
   documentCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    gap: 14,
-    shadowColor: Colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 8,
-    elevation: 2,
+    backgroundColor: Colors.surface, borderRadius: 18, marginBottom: 10,
+    flexDirection: "row", alignItems: "center", padding: 14, gap: 14,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1, shadowRadius: 14, elevation: 4,
   },
-  docIconContainer: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  docInfo: {
-    flex: 1,
-  },
-  docName: {
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
-    lineHeight: 20,
-  },
-  docMeta: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    marginTop: 4,
-  },
-  docDate: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  docMetaSep: {
-    fontSize: 12,
-    color: Colors.textTertiary,
-  },
-  docSize: {
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 40,
-  },
+  docIconContainer: { width: 52, height: 52, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  docInfo: { flex: 1 },
+  docName: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text, lineHeight: 20 },
+  docMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
+  docDate: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  docMetaSep: { fontSize: 12, color: Colors.textTertiary },
+  docSize: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
   emptyIcon: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.primaryLight,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
+    width: 88, height: 88, borderRadius: 44,
+    backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center", marginBottom: 16,
   },
-  emptyTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: Colors.text,
-    marginBottom: 8,
-  },
+  emptyTitle: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text, marginBottom: 8 },
   emptySubtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
-    textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
+    fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary,
+    textAlign: "center", lineHeight: 20, marginBottom: 24,
   },
   emptyButton: {
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 14,
+    borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 8,
   },
-  emptyButtonText: {
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textLight,
-  },
+  emptyButtonText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.textLight },
 });

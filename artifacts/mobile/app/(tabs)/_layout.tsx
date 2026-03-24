@@ -3,23 +3,29 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
+import { useLanguage } from "@/context/LanguageContext";
 
 function NativeTabLayout() {
+  const { t } = useLanguage();
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
         <Icon sf={{ default: "pawprint", selected: "pawprint.fill" }} />
-        <Label>Тварини</Label>
+        <Label>{t.pets}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="reminders">
         <Icon sf={{ default: "bell", selected: "bell.fill" }} />
-        <Label>Нагадування</Label>
+        <Label>{t.reminders}</Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="settings">
+        <Icon sf={{ default: "gear", selected: "gear" }} />
+        <Label>{t.settings}</Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );
@@ -31,6 +37,7 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const insets = useSafeAreaInsets();
+  const { t } = useLanguage();
 
   return (
     <Tabs
@@ -49,15 +56,9 @@ function ClassicTabLayout() {
         },
         tabBarBackground: () =>
           isIOS ? (
-            <BlurView
-              intensity={95}
-              tint="light"
-              style={StyleSheet.absoluteFill}
-            />
+            <BlurView intensity={95} tint="light" style={StyleSheet.absoluteFill} />
           ) : isWeb ? (
-            <View
-              style={[StyleSheet.absoluteFill, { backgroundColor: Colors.surface }]}
-            />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: Colors.surface }]} />
           ) : null,
         tabBarLabelStyle: {
           fontFamily: "Inter_500Medium",
@@ -68,24 +69,36 @@ function ClassicTabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Тварини",
+          title: t.pets,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="pawprint.fill" tintColor={color} size={24} />
             ) : (
-              <Feather name="heart" size={22} color={color} />
+              <Ionicons name="paw" size={22} color={color} />
             ),
         }}
       />
       <Tabs.Screen
         name="reminders"
         options={{
-          title: "Нагадування",
+          title: t.reminders,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="bell.fill" tintColor={color} size={24} />
             ) : (
-              <Feather name="bell" size={22} color={color} />
+              <Ionicons name="notifications" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="settings"
+        options={{
+          title: t.settings,
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="gear" tintColor={color} size={24} />
+            ) : (
+              <Ionicons name="settings-outline" size={22} color={color} />
             ),
         }}
       />
@@ -94,8 +107,6 @@ function ClassicTabLayout() {
 }
 
 export default function TabLayout() {
-  if (isLiquidGlassAvailable()) {
-    return <NativeTabLayout />;
-  }
+  if (isLiquidGlassAvailable()) return <NativeTabLayout />;
   return <ClassicTabLayout />;
 }

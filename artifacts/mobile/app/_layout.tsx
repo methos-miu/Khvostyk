@@ -14,6 +14,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PetsProvider } from "@/context/PetsContext";
+import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
 import { Colors } from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
@@ -21,10 +22,12 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const { t } = useLanguage();
+
   return (
     <Stack
       screenOptions={{
-        headerBackTitle: "Назад",
+        headerBackTitle: t.back,
         headerStyle: { backgroundColor: Colors.surface },
         headerTintColor: Colors.primary,
         headerTitleStyle: {
@@ -37,46 +40,29 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen
         name="pet/[id]"
-        options={{
-          title: "Профіль тварини",
-          headerBackTitle: "Назад",
-        }}
+        options={{ title: t.profile, headerBackTitle: t.back }}
       />
       <Stack.Screen
         name="pet/add"
-        options={{
-          title: "Додати тварину",
-          headerBackTitle: "Скасувати",
-          presentation: "modal",
-        }}
+        options={{ title: t.addPetTitle, headerBackTitle: t.cancel, presentation: "modal" }}
       />
       <Stack.Screen
         name="pet/vaccinations/[id]"
-        options={{
-          title: "Вакцинації",
-          headerBackTitle: "Назад",
-        }}
+        options={{ title: t.vaccinations, headerBackTitle: t.back }}
       />
       <Stack.Screen
         name="pet/documents/[id]"
-        options={{
-          title: "Документи",
-          headerBackTitle: "Назад",
-        }}
+        options={{ title: t.documents, headerBackTitle: t.back }}
       />
       <Stack.Screen
         name="pet/add-vaccination/[id]"
-        options={{
-          title: "Додати вакцинацію",
-          presentation: "modal",
-          headerBackTitle: "Скасувати",
-        }}
+        options={{ title: t.addVaccination, presentation: "modal", headerBackTitle: t.cancel }}
       />
     </Stack>
   );
 }
 
-export default function RootLayout() {
+function AppProviders({ children }: { children: React.ReactNode }) {
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -85,21 +71,27 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded || fontError) SplashScreen.hideAsync();
   }, [fontsLoaded, fontError]);
 
   if (!fontsLoaded && !fontError) return null;
 
+  return <>{children}</>;
+}
+
+export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <PetsProvider>
-              <RootLayoutNav />
-            </PetsProvider>
+            <LanguageProvider>
+              <PetsProvider>
+                <AppProviders>
+                  <RootLayoutNav />
+                </AppProviders>
+              </PetsProvider>
+            </LanguageProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>
