@@ -53,6 +53,16 @@ A pet health tracker app built with Expo SDK 53 / React Native.
 11. Data export/import: full JSON backup of all pets, vaccinations, documents, reminders, weight history
 12. `migratePet()` for backward compatibility with old data
 
+### Authentication & Cloud Sync (Supabase)
+- **Backend**: Supabase project `kbjndjxjgesybouimdny` (supabase.co)
+- **Auth**: Email/password via Supabase Auth
+- **Env vars**: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY` (shared env)
+- **Auth screens**: `app/(auth)/welcome.tsx`, `login.tsx`, `register.tsx`, `forgot-password.tsx`
+- **Auth routing**: `AuthGuard` in `_layout.tsx` redirects unauthenticated → `/(auth)/welcome`
+- **Data sync strategy**: AsyncStorage as instant local cache; Supabase syncs in background on auth state change; each write goes to local state + AsyncStorage immediately, then to Supabase async. Offline-capable.
+- **6 Supabase tables**: `users`, `pets`, `vaccinations`, `documents`, `weight_entries`, `reminders` (all with RLS policies)
+- **User profile**: shown in Settings tab (initials avatar, email, logout button)
+
 ### Key Files
 - `app/(tabs)/index.tsx` — Home/pets list
 - `app/(tabs)/reminders.tsx` — Reminders with tabs, birthday + custom reminders
