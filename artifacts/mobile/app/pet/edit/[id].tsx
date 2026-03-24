@@ -39,6 +39,8 @@ import { Species, Gender, usePets } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { DatePickerField } from "@/components/ui/DatePickerField";
 import { BreedPickerModal } from "@/components/ui/BreedPickerModal";
+import { AnimalPickerModal } from "@/components/ui/AnimalPickerModal";
+import { getAnimalEmoji, getAnimalName, legacySpeciesKey } from "@/constants/animals";
 
 type FormData = {
   name: string;
@@ -52,20 +54,7 @@ type FormData = {
   gender: Gender;
 };
 
-const ALL_SPECIES: { value: Species; icon: string }[] = [
-  { value: "cat", icon: "🐈" },
-  { value: "dog", icon: "🐕" },
-  { value: "rabbit", icon: "🐇" },
-  { value: "hamster", icon: "🐹" },
-  { value: "guinea_pig", icon: "🐾" },
-  { value: "bird", icon: "🐦" },
-  { value: "turtle", icon: "🐢" },
-  { value: "reptile", icon: "🦎" },
-  { value: "fish", icon: "🐟" },
-  { value: "ferret", icon: "🦡" },
-  { value: "hedgehog", icon: "🦔" },
-  { value: "other", icon: "✨" },
-];
+const LEGACY_SPECIES = ["rabbit","hamster","guinea_pig","bird","turtle","reptile","fish","ferret","hedgehog"];
 
 const WEIGHT_VALUES = Array.from({ length: 1000 }, (_, i) =>
   ((i + 1) * 0.1).toFixed(1)
@@ -99,13 +88,26 @@ export default function EditPetScreen() {
   const [loading, setLoading] = useState(false);
   const [showBreedPicker, setShowBreedPicker] = useState(false);
   const [showWeightPicker, setShowWeightPicker] = useState(false);
+  const [showAnimalPicker, setShowAnimalPicker] = useState(false);
 
   const pet = getPet(id);
 
+  // Migrate legacy species codes (rabbit, hamster, etc.) → "other" + customSpecies key
+  const initSpecies = (): Species => {
+    if (!pet) return "cat";
+    if (LEGACY_SPECIES.includes(pet.species)) return "other";
+    return pet.species;
+  };
+  const initCustomSpecies = (): string => {
+    if (!pet) return "";
+    if (LEGACY_SPECIES.includes(pet.species)) return legacySpeciesKey(pet.species) ?? pet.species;
+    return pet.customSpecies ?? "";
+  };
+
   const [form, setForm] = useState<FormData>({
     name: pet?.name ?? "",
-    species: pet?.species ?? "dog",
-    customSpecies: pet?.customSpecies ?? "",
+    species: initSpecies(),
+    customSpecies: initCustomSpecies(),
     breed: pet?.breed ?? "",
     birthdate: pet?.birthdate ?? "",
     weight: pet?.weight ?? "",
@@ -117,8 +119,6 @@ export default function EditPetScreen() {
   const updateForm = (key: keyof FormData, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
-
-  const speciesLabel = (s: Species) => (t as any)[s] ?? t.other;
 
   const pickPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -232,51 +232,67 @@ export default function EditPetScreen() {
             </View>
           </Pressable>
 
-          {/* Species */}
+          {/* Species — 3-button picker */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.petType}</Text>
-            <View style={styles.speciesGrid}>
-              {ALL_SPECIES.map((opt) => (
-                <Pressable
-                  key={opt.value}
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    updateForm("species", opt.value);
-                    updateForm("breed", "");
-                    if (opt.value !== "other") updateForm("customSpecies", "");
-                  }}
-                  style={[
-                    styles.speciesOption,
-                    form.species === opt.value && styles.speciesOptionActive,
-                  ]}
-                >
-                  <Text style={styles.speciesIcon}>{opt.icon}</Text>
-                  <Text style={[
-                    styles.speciesLabel,
-                    form.species === opt.value && styles.speciesLabelActive,
-                  ]} numberOfLines={2}>
-                    {speciesLabel(opt.value)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            {form.species === "other" && (
-              <Animated.View entering={FadeInDown.duration(220).springify()} style={styles.customSpeciesBox}>
-                <Text style={styles.customSpeciesHint}>
-                  {language === "uk" ? "Введіть назву вашої тварини" : "Enter your pet's species"}
+            <View style={styles.mainSpeciesRow}>
+              {/* Cat */}
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  updateForm("species", "cat");
+                  updateForm("customSpecies", "");
+                  updateForm("breed", "");
+                }}
+                style={[styles.mainSpeciesBtn, form.species === "cat" && styles.mainSpeciesBtnActive]}
+              >
+                <Text style={styles.mainSpeciesEmoji}>🐱</Text>
+                <Text style={[styles.mainSpeciesLabel, form.species === "cat" && styles.mainSpeciesLabelActive]}>
+                  {language === "uk" ? "Кіт" : "Cat"}
                 </Text>
-                <TextInput
-                  style={styles.customSpeciesInput}
-                  value={form.customSpecies}
-                  onChangeText={(v) => updateForm("customSpecies", v)}
-                  placeholder={language === "uk" ? "Яка тварина?" : "What animal?"}
-                  placeholderTextColor={Colors.textTertiary}
-                  autoFocus
-                  returnKeyType="done"
-                />
-              </Animated.View>
-            )}
+              </Pressable>
+
+              {/* Dog */}
+              <Pressable
+                onPress={() => {
+                  Haptics.selectionAsync();
+                  updateForm("species", "dog");
+                  updateForm("customSpecies", "");
+                  updateForm("breed", "");
+                }}
+                style={[styles.mainSpeciesBtn, form.species === "dog" && styles.mainSpeciesBtnActive]}
+              >
+                <Text style={styles.mainSpeciesEmoji}>🐶</Text>
+                <Text style={[styles.mainSpeciesLabel, form.species === "dog" && styles.mainSpeciesLabelActive]}>
+                  {language === "uk" ? "Собака" : "Dog"}
+                </Text>
+              </Pressable>
+
+              {/* Other — opens animal picker */}
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowAnimalPicker(true);
+                }}
+                style={[styles.mainSpeciesBtn, form.species === "other" && styles.mainSpeciesBtnActive]}
+              >
+                {form.species === "other" && form.customSpecies ? (
+                  <>
+                    <Text style={styles.mainSpeciesEmoji}>{getAnimalEmoji("other", form.customSpecies)}</Text>
+                    <Text style={[styles.mainSpeciesLabel, styles.mainSpeciesLabelActive]} numberOfLines={2}>
+                      {getAnimalName("other", form.customSpecies, language)}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={styles.mainSpeciesEmoji}>🔍</Text>
+                    <Text style={[styles.mainSpeciesLabel, form.species === "other" && styles.mainSpeciesLabelActive]}>
+                      {language === "uk" ? "Інше" : "Other"}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
           </View>
 
           {/* Gender */}
@@ -431,6 +447,24 @@ export default function EditPetScreen() {
         language={language}
       />
 
+      <AnimalPickerModal
+        visible={showAnimalPicker}
+        language={language}
+        onClose={() => setShowAnimalPicker(false)}
+        onSelect={(key) => {
+          updateForm("species", "other");
+          updateForm("customSpecies", key);
+          updateForm("breed", "");
+          setShowAnimalPicker(false);
+        }}
+        onCustom={(name) => {
+          updateForm("species", "other");
+          updateForm("customSpecies", name);
+          updateForm("breed", "");
+          setShowAnimalPicker(false);
+        }}
+      />
+
       {/* Weight Picker Modal */}
       <Modal
         visible={showWeightPicker}
@@ -510,36 +544,26 @@ const styles = StyleSheet.create({
     fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,
     textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10, marginLeft: 4,
   },
-  speciesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  customSpeciesBox: {
-    marginTop: 12,
-    backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1.5,
+  mainSpeciesRow: { flexDirection: "row", gap: 10 },
+  mainSpeciesBtn: {
+    flex: 1, alignItems: "center", justifyContent: "center",
+    paddingVertical: 16, paddingHorizontal: 6,
+    backgroundColor: Colors.surface, borderRadius: 18,
+    borderWidth: 2, borderColor: Colors.border,
+    gap: 6, minHeight: 86,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1, shadowRadius: 6, elevation: 2,
+  },
+  mainSpeciesBtnActive: {
     borderColor: Colors.primary,
-    gap: 6,
+    backgroundColor: Colors.primaryLight,
   },
-  customSpeciesHint: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    color: Colors.primary,
+  mainSpeciesEmoji: { fontSize: 30 },
+  mainSpeciesLabel: {
+    fontSize: 12, fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary, textAlign: "center",
   },
-  customSpeciesInput: {
-    fontSize: 16,
-    fontFamily: "Inter_500Medium",
-    color: Colors.text,
-    padding: 0,
-  },
-  speciesOption: {
-    width: "22%",
-    backgroundColor: Colors.surface, borderRadius: 14, padding: 10,
-    alignItems: "center", gap: 4, borderWidth: 2, borderColor: Colors.border,
-  },
-  speciesOptionActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
-  speciesIcon: { fontSize: 22 },
-  speciesLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: Colors.textSecondary, textAlign: "center" },
-  speciesLabelActive: { color: Colors.primary },
+  mainSpeciesLabelActive: { color: Colors.primary },
   genderRow: { flexDirection: "row", gap: 12 },
   genderOption: {
     flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,

@@ -27,12 +27,7 @@ import { Pet, usePets } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getSpeciesLabel } from "@/utils/speciesLabel";
 import { calculateAge } from "@/utils/notifications";
-
-const SPECIES_EMOJI: Record<string, string> = {
-  cat: "🐈", dog: "🐕", rabbit: "🐇", hamster: "🐹",
-  guinea_pig: "🐾", bird: "🐦", turtle: "🐢", reptile: "🦎",
-  fish: "🐟", ferret: "🦡", hedgehog: "🦔", other: "🐾",
-};
+import { getAnimalEmoji } from "@/constants/animals";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -64,7 +59,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
               colors={[Colors.gradientStart, Colors.gradientEnd]}
               style={styles.cardPhotoPlaceholder}
             >
-              <Text style={styles.speciesEmoji}>{SPECIES_EMOJI[pet.species] ?? "🐾"}</Text>
+              <Text style={styles.speciesEmoji}>{getAnimalEmoji(pet.species, pet.customSpecies)}</Text>
             </LinearGradient>
           )}
           {/* Gender badge */}

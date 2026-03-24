@@ -1,35 +1,5 @@
 import { Species, Gender } from "@/context/PetsContext";
-
-/** Returns gendered species label in Ukrainian */
-const UK_LABELS: Record<Species, { male: string; female: string; neutral: string }> = {
-  cat:       { male: "Кіт",           female: "Кішка",        neutral: "Кіт / Кішка" },
-  dog:       { male: "Пес",           female: "Собачка",      neutral: "Собака" },
-  rabbit:    { male: "Кролик",        female: "Крольчиха",    neutral: "Кролик" },
-  hamster:   { male: "Хом'як",        female: "Хом'ячка",     neutral: "Хом'як" },
-  guinea_pig:{ male: "Морський свин", female: "Морська свинка",neutral: "Морська свинка" },
-  bird:      { male: "Птах",          female: "Птаха",        neutral: "Птах" },
-  turtle:    { male: "Черепах",       female: "Черепаха",     neutral: "Черепаха" },
-  reptile:   { male: "Рептилій",      female: "Рептилія",     neutral: "Рептилія" },
-  fish:      { male: "Рибка",         female: "Рибка",        neutral: "Рибка" },
-  ferret:    { male: "Тхір",          female: "Тхориця",      neutral: "Тхір" },
-  hedgehog:  { male: "Їжак",          female: "Їжачиха",      neutral: "Їжак" },
-  other:     { male: "Улюбленець",    female: "Улюбленка",    neutral: "Інше" },
-};
-
-const EN_LABELS: Record<Species, { male: string; female: string; neutral: string }> = {
-  cat:       { male: "Cat",         female: "Cat",          neutral: "Cat" },
-  dog:       { male: "Dog",         female: "Dog",          neutral: "Dog" },
-  rabbit:    { male: "Rabbit",      female: "Rabbit",       neutral: "Rabbit" },
-  hamster:   { male: "Hamster",     female: "Hamster",      neutral: "Hamster" },
-  guinea_pig:{ male: "Guinea Pig",  female: "Guinea Pig",   neutral: "Guinea Pig" },
-  bird:      { male: "Bird",        female: "Bird",         neutral: "Bird" },
-  turtle:    { male: "Turtle",      female: "Turtle",       neutral: "Turtle" },
-  reptile:   { male: "Reptile",     female: "Reptile",      neutral: "Reptile" },
-  fish:      { male: "Fish",        female: "Fish",         neutral: "Fish" },
-  ferret:    { male: "Ferret",      female: "Ferret",       neutral: "Ferret" },
-  hedgehog:  { male: "Hedgehog",    female: "Hedgehog",     neutral: "Hedgehog" },
-  other:     { male: "Pet",         female: "Pet",          neutral: "Other" },
-};
+import { getAnimalName } from "@/constants/animals";
 
 export function getSpeciesLabel(
   species: Species,
@@ -37,12 +7,23 @@ export function getSpeciesLabel(
   lang: "uk" | "en" = "uk",
   customSpecies?: string
 ): string {
-  if (species === "other" && customSpecies?.trim()) {
-    return customSpecies.trim();
+  // Delegate to the central animal name lookup
+  const name = getAnimalName(species, customSpecies, lang);
+
+  // For cat/dog apply gendered forms
+  if (species === "cat" && lang === "uk") {
+    if (gender === "male") return "Кіт";
+    if (gender === "female") return "Кішка";
+    return "Кіт / Кішка";
   }
-  const map = lang === "uk" ? UK_LABELS : EN_LABELS;
-  const entry = map[species] ?? map.other;
-  if (gender === "male") return entry.male;
-  if (gender === "female") return entry.female;
-  return entry.neutral;
+  if (species === "cat") return "Cat";
+
+  if (species === "dog" && lang === "uk") {
+    if (gender === "male") return "Пес";
+    if (gender === "female") return "Собачка";
+    return "Собака";
+  }
+  if (species === "dog") return "Dog";
+
+  return name;
 }

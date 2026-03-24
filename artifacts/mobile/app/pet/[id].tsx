@@ -26,12 +26,7 @@ import { usePets, MedicalProfile } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getSpeciesLabel } from "@/utils/speciesLabel";
 import { calculateAge, formatDateShort, formatDate } from "@/utils/notifications";
-
-const SPECIES_EMOJI: Record<string, string> = {
-  cat: "🐈", dog: "🐕", rabbit: "🐇", hamster: "🐹",
-  guinea_pig: "🐾", bird: "🐦", turtle: "🐢", reptile: "🦎",
-  fish: "🐟", ferret: "🦡", hedgehog: "🦔", other: "🐾",
-};
+import { getAnimalEmoji } from "@/constants/animals";
 
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -139,7 +134,7 @@ export default function PetProfileScreen() {
                   <Image source={{ uri: pet.photoUri }} style={styles.heroPhoto} contentFit="cover" />
                 ) : (
                   <View style={styles.heroEmojiWrap}>
-                    <Text style={styles.heroEmoji}>{SPECIES_EMOJI[pet.species] ?? "🐾"}</Text>
+                    <Text style={styles.heroEmoji}>{getAnimalEmoji(pet.species, pet.customSpecies)}</Text>
                   </View>
                 )}
               </View>
