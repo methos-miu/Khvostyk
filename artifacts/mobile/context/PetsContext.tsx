@@ -7,6 +7,8 @@ import React, {
   useState,
 } from "react";
 
+import { supabase } from "@/lib/supabase";
+
 export type Species =
   | "cat" | "dog" | "rabbit" | "hamster" | "guinea_pig"
   | "bird" | "turtle" | "reptile" | "fish" | "ferret"
@@ -94,6 +96,7 @@ interface PetsContextType {
   deleteReminder: (petId: string, reminderId: string) => Promise<void>;
   getPet: (id: string) => Pet | undefined;
   isLoaded: boolean;
+  isSyncing: boolean;
   exportData: () => string;
   importData: (json: string) => Promise<boolean>;
 }
@@ -111,6 +114,7 @@ function migratePet(raw: any): Pet {
     id: raw.id ?? generateId(),
     name: raw.name ?? "",
     species: raw.species ?? "other",
+    customSpecies: raw.customSpecies,
     breed: raw.breed ?? "",
     birthdate: raw.birthdate ?? "",
     weight: raw.weight ?? "",
@@ -126,25 +130,127 @@ function migratePet(raw: any): Pet {
   };
 }
 
+async function getCurrentUserId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser();
+  return user?.id ?? null;
+}
+
+// ─── Supabase row → Pet assembler ────────────────────────────────────────────
+function assemblePets(
+  petsRows: any[],
+  vaccsRows: any[],
+  docsRows: any[],
+  weightsRows: any[],
+  remindersRows: any[]
+): Pet[] {
+  return petsRows.map(p => ({
+    id: p.id,
+    name: p.name ?? "",
+    species: (p.species as Species) ?? "other",
+    customSpecies: p.custom_species ?? undefined,
+    breed: p.breed ?? "",
+    birthdate: p.birthdate ?? "",
+    weight: p.weight ?? "",
+    photoUri: p.photo_url ?? undefined,
+    color: p.color ?? undefined,
+    gender: (p.gender as Gender) ?? null,
+    medicalProfile: p.medical_profile ?? undefined,
+    createdAt: p.created_at ?? new Date().toISOString(),
+    vaccinations: vaccsRows
+      .filter(v => v.pet_id === p.id)
+      .map(v => ({
+        id: v.id, name: v.name ?? "", date: v.date ?? "", nextDate: v.next_date ?? "",
+        notes: v.notes ?? undefined, vetName: v.vet_name ?? undefined,
+        notificationId: v.notification_id ?? undefined,
+      })),
+    documents: docsRows
+      .filter(d => d.pet_id === p.id)
+      .map(d => ({
+        id: d.id, name: d.name ?? "", uri: d.uri ?? "", type: d.type ?? "",
+        date: d.date ?? "", size: d.size ?? undefined,
+        category: (d.category as DocumentCategory) ?? undefined,
+      })),
+    weightHistory: weightsRows
+      .filter(w => w.pet_id === p.id)
+      .map(w => ({ id: w.id, date: w.date ?? "", weight: Number(w.weight) })),
+    reminders: remindersRows
+      .filter(r => r.pet_id === p.id)
+      .map(r => ({
+        id: r.id, type: r.type as ReminderType, date: r.date ?? "",
+        nextDate: r.next_date ?? "", notes: r.notes ?? undefined,
+        notificationId: r.notification_id ?? undefined,
+      })),
+  }));
+}
+
 export function PetsProvider({ children }: { children: React.ReactNode }) {
   const [pets, setPets] = useState<Pet[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
+  // ── Initial load from local cache ──────────────────────────────────────────
   useEffect(() => {
-    loadPets();
+    (async () => {
+      try {
+        const data = await AsyncStorage.getItem(STORAGE_KEY);
+        if (data) {
+          const parsed = JSON.parse(data);
+          setPets(Array.isArray(parsed) ? parsed.map(migratePet) : []);
+        }
+      } catch (e) {
+        console.error("Failed to load pets from cache", e);
+      } finally {
+        setIsLoaded(true);
+      }
+    })();
   }, []);
 
-  const loadPets = async () => {
-    try {
-      const data = await AsyncStorage.getItem(STORAGE_KEY);
-      if (data) {
-        const parsed = JSON.parse(data);
-        setPets(Array.isArray(parsed) ? parsed.map(migratePet) : []);
+  // ── Listen for auth changes → sync from Supabase ───────────────────────────
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session?.user) {
+        syncFromSupabase(session.user.id);
+      } else if (event === "SIGNED_OUT") {
+        setPets([]);
+        await AsyncStorage.removeItem(STORAGE_KEY);
       }
+    });
+    // Also trigger on initial load if already authenticated
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) syncFromSupabase(session.user.id);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // ── Fetch all data from Supabase and update state ──────────────────────────
+  const syncFromSupabase = async (userId: string) => {
+    setIsSyncing(true);
+    try {
+      const { data: petsRows, error } = await supabase
+        .from("pets").select("*").eq("owner_id", userId);
+      if (error || !petsRows?.length) { setIsSyncing(false); return; }
+
+      const petIds = petsRows.map(p => p.id);
+      const [vaccs, docs, weights, reminders] = await Promise.all([
+        supabase.from("vaccinations").select("*").in("pet_id", petIds),
+        supabase.from("documents").select("*").in("pet_id", petIds),
+        supabase.from("weight_entries").select("*").in("pet_id", petIds),
+        supabase.from("reminders").select("*").in("pet_id", petIds),
+      ]);
+
+      const assembled = assemblePets(
+        petsRows,
+        vaccs.data ?? [],
+        docs.data ?? [],
+        weights.data ?? [],
+        reminders.data ?? []
+      );
+      setPets(assembled);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(assembled));
     } catch (e) {
-      console.error("Failed to load pets", e);
+      console.warn("Supabase sync failed (offline?)", e);
     } finally {
-      setIsLoaded(true);
+      setIsSyncing(false);
     }
   };
 
@@ -156,20 +262,31 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // ─── PETS ─────────────────────────────────────────────────────────────────
   const addPet = useCallback(
     async (petData: Omit<Pet, "id" | "createdAt" | "vaccinations" | "documents" | "weightHistory" | "reminders">) => {
       const newPet: Pet = {
         ...petData,
         id: generateId(),
         createdAt: new Date().toISOString(),
-        vaccinations: [],
-        documents: [],
-        weightHistory: [],
-        reminders: [],
+        vaccinations: [], documents: [], weightHistory: [], reminders: [],
       };
       const updated = [...pets, newPet];
       setPets(updated);
       await savePets(updated);
+
+      getCurrentUserId().then(uid => {
+        if (!uid) return;
+        supabase.from("pets").insert({
+          id: newPet.id, owner_id: uid, name: newPet.name,
+          species: newPet.species, custom_species: newPet.customSpecies ?? null,
+          breed: newPet.breed, birthdate: newPet.birthdate, weight: newPet.weight,
+          gender: newPet.gender, color: newPet.color ?? null,
+          photo_url: newPet.photoUri ?? null,
+          medical_profile: newPet.medicalProfile ?? null,
+          created_at: newPet.createdAt,
+        }).then(({ error }) => { if (error) console.warn("Supabase addPet:", error.message); });
+      });
       return newPet;
     },
     [pets]
@@ -177,152 +294,223 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
   const updatePet = useCallback(
     async (id: string, updates: Partial<Pet>) => {
-      const updated = pets.map((p) => (p.id === id ? { ...p, ...updates } : p));
+      const updated = pets.map(p => p.id === id ? { ...p, ...updates } : p);
       setPets(updated);
       await savePets(updated);
+
+      getCurrentUserId().then(uid => {
+        if (!uid) return;
+        supabase.from("pets").update({
+          name: updates.name, species: updates.species,
+          custom_species: updates.customSpecies ?? null,
+          breed: updates.breed, birthdate: updates.birthdate, weight: updates.weight,
+          gender: updates.gender, color: updates.color ?? null,
+          photo_url: updates.photoUri ?? null,
+          medical_profile: updates.medicalProfile ?? null,
+          updated_at: new Date().toISOString(),
+        }).eq("id", id).then(({ error }) => { if (error) console.warn("Supabase updatePet:", error.message); });
+      });
     },
     [pets]
   );
 
   const deletePet = useCallback(
     async (id: string) => {
-      const updated = pets.filter((p) => p.id !== id);
+      const updated = pets.filter(p => p.id !== id);
       setPets(updated);
       await savePets(updated);
+
+      getCurrentUserId().then(uid => {
+        if (!uid) return;
+        supabase.from("pets").delete().eq("id", id)
+          .then(({ error }) => { if (error) console.warn("Supabase deletePet:", error.message); });
+      });
     },
     [pets]
   );
 
+  // ─── VACCINATIONS ─────────────────────────────────────────────────────────
   const addVaccination = useCallback(
     async (petId: string, vaccination: Omit<Vaccination, "id">) => {
       const newV: Vaccination = { ...vaccination, id: generateId() };
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId ? { ...p, vaccinations: [...p.vaccinations, newV] } : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("vaccinations").insert({
+        id: newV.id, pet_id: petId, name: newV.name, date: newV.date,
+        next_date: newV.nextDate, notes: newV.notes ?? null,
+        vet_name: newV.vetName ?? null, notification_id: newV.notificationId ?? null,
+      }).then(({ error }) => { if (error) console.warn("Supabase addVaccination:", error.message); });
     },
     [pets]
   );
 
   const updateVaccination = useCallback(
     async (petId: string, vaccinationId: string, updates: Partial<Vaccination>) => {
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
-          ? { ...p, vaccinations: p.vaccinations.map((v) => v.id === vaccinationId ? { ...v, ...updates } : v) }
+          ? { ...p, vaccinations: p.vaccinations.map(v => v.id === vaccinationId ? { ...v, ...updates } : v) }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("vaccinations").update({
+        name: updates.name, date: updates.date, next_date: updates.nextDate,
+        notes: updates.notes ?? null, vet_name: updates.vetName ?? null,
+        notification_id: updates.notificationId ?? null,
+      }).eq("id", vaccinationId)
+        .then(({ error }) => { if (error) console.warn("Supabase updateVaccination:", error.message); });
     },
     [pets]
   );
 
   const deleteVaccination = useCallback(
     async (petId: string, vaccinationId: string) => {
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
-          ? { ...p, vaccinations: p.vaccinations.filter((v) => v.id !== vaccinationId) }
+          ? { ...p, vaccinations: p.vaccinations.filter(v => v.id !== vaccinationId) }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("vaccinations").delete().eq("id", vaccinationId)
+        .then(({ error }) => { if (error) console.warn("Supabase deleteVaccination:", error.message); });
     },
     [pets]
   );
 
+  // ─── DOCUMENTS ────────────────────────────────────────────────────────────
   const addDocument = useCallback(
     async (petId: string, document: Omit<Document, "id">) => {
       const newDoc: Document = { ...document, id: generateId() };
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId ? { ...p, documents: [...p.documents, newDoc] } : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("documents").insert({
+        id: newDoc.id, pet_id: petId, name: newDoc.name, uri: newDoc.uri,
+        type: newDoc.type, date: newDoc.date, size: newDoc.size ?? null,
+        category: newDoc.category ?? null,
+      }).then(({ error }) => { if (error) console.warn("Supabase addDocument:", error.message); });
     },
     [pets]
   );
 
   const deleteDocument = useCallback(
     async (petId: string, documentId: string) => {
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
-          ? { ...p, documents: p.documents.filter((d) => d.id !== documentId) }
+          ? { ...p, documents: p.documents.filter(d => d.id !== documentId) }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("documents").delete().eq("id", documentId)
+        .then(({ error }) => { if (error) console.warn("Supabase deleteDocument:", error.message); });
     },
     [pets]
   );
 
+  // ─── WEIGHT ───────────────────────────────────────────────────────────────
   const addWeightEntry = useCallback(
     async (petId: string, entry: Omit<WeightEntry, "id">) => {
       const newEntry: WeightEntry = { ...entry, id: generateId() };
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
           ? { ...p, weightHistory: [...(p.weightHistory ?? []), newEntry] }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("weight_entries").insert({
+        id: newEntry.id, pet_id: petId, date: newEntry.date, weight: newEntry.weight,
+      }).then(({ error }) => { if (error) console.warn("Supabase addWeightEntry:", error.message); });
     },
     [pets]
   );
 
   const deleteWeightEntry = useCallback(
     async (petId: string, entryId: string) => {
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
-          ? { ...p, weightHistory: (p.weightHistory ?? []).filter((e) => e.id !== entryId) }
+          ? { ...p, weightHistory: (p.weightHistory ?? []).filter(e => e.id !== entryId) }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("weight_entries").delete().eq("id", entryId)
+        .then(({ error }) => { if (error) console.warn("Supabase deleteWeightEntry:", error.message); });
     },
     [pets]
   );
 
+  // ─── REMINDERS ────────────────────────────────────────────────────────────
   const addReminder = useCallback(
     async (petId: string, reminder: Omit<Reminder, "id">) => {
       const newR: Reminder = { ...reminder, id: generateId() };
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId ? { ...p, reminders: [...(p.reminders ?? []), newR] } : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("reminders").insert({
+        id: newR.id, pet_id: petId, type: newR.type, date: newR.date,
+        next_date: newR.nextDate, notes: newR.notes ?? null,
+        notification_id: newR.notificationId ?? null,
+      }).then(({ error }) => { if (error) console.warn("Supabase addReminder:", error.message); });
     },
     [pets]
   );
 
   const updateReminder = useCallback(
     async (petId: string, reminderId: string, updates: Partial<Reminder>) => {
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
-          ? { ...p, reminders: (p.reminders ?? []).map((r) => r.id === reminderId ? { ...r, ...updates } : r) }
+          ? { ...p, reminders: (p.reminders ?? []).map(r => r.id === reminderId ? { ...r, ...updates } : r) }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("reminders").update({
+        type: updates.type, date: updates.date, next_date: updates.nextDate,
+        notes: updates.notes ?? null, notification_id: updates.notificationId ?? null,
+      }).eq("id", reminderId)
+        .then(({ error }) => { if (error) console.warn("Supabase updateReminder:", error.message); });
     },
     [pets]
   );
 
   const deleteReminder = useCallback(
     async (petId: string, reminderId: string) => {
-      const updated = pets.map((p) =>
+      const updated = pets.map(p =>
         p.id === petId
-          ? { ...p, reminders: (p.reminders ?? []).filter((r) => r.id !== reminderId) }
+          ? { ...p, reminders: (p.reminders ?? []).filter(r => r.id !== reminderId) }
           : p
       );
       setPets(updated);
       await savePets(updated);
+
+      supabase.from("reminders").delete().eq("id", reminderId)
+        .then(({ error }) => { if (error) console.warn("Supabase deleteReminder:", error.message); });
     },
     [pets]
   );
 
+  // ─── HELPERS ──────────────────────────────────────────────────────────────
   const getPet = useCallback(
-    (id: string) => pets.find((p) => p.id === id),
+    (id: string) => pets.find(p => p.id === id),
     [pets]
   );
 
@@ -350,7 +538,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         addDocument, deleteDocument,
         addWeightEntry, deleteWeightEntry,
         addReminder, updateReminder, deleteReminder,
-        getPet, isLoaded,
+        getPet, isLoaded, isSyncing,
         exportData, importData,
       }}
     >

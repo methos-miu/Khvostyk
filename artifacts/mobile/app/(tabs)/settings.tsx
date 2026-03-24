@@ -19,10 +19,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { Language, useLanguage } from "@/context/LanguageContext";
 import { usePets } from "@/context/PetsContext";
+import { useAuth } from "@/context/AuthContext";
 
 export default function SettingsScreen() {
   const { t, language, setLanguage } = useLanguage();
   const { exportData, importData, pets } = usePets();
+  const { user, profile, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
   const [exporting, setExporting] = useState(false);
@@ -31,6 +33,26 @@ export default function SettingsScreen() {
   const handleLanguage = (lang: Language) => {
     Haptics.selectionAsync();
     setLanguage(lang);
+  };
+
+  const handleLogout = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Alert.alert(
+      language === "uk" ? "Вийти з акаунту?" : "Sign out?",
+      language === "uk"
+        ? "Ваші дані збережені в хмарі і будуть доступні після входу знову"
+        : "Your data is saved in the cloud and will be available after signing in again",
+      [
+        { text: t.cancel, style: "cancel" },
+        {
+          text: language === "uk" ? "Вийти" : "Sign out",
+          style: "destructive",
+          onPress: async () => {
+            await logout();
+          },
+        },
+      ]
+    );
   };
 
   const handleExport = async () => {
@@ -113,6 +135,11 @@ export default function SettingsScreen() {
     );
   };
 
+  // User initials for avatar
+  const initials = profile?.name
+    ? profile.name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2)
+    : user?.email?.slice(0, 2).toUpperCase() ?? "?";
+
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -129,6 +156,45 @@ export default function SettingsScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: Platform.OS === "web" ? 100 : 80 }]}
         showsVerticalScrollIndicator={false}
       >
+
+        {/* Profile card */}
+        {user && (
+          <Animated.View entering={FadeInDown.delay(60)}>
+            <Text style={styles.sectionLabel}>{language === "uk" ? "Акаунт" : "Account"}</Text>
+            <View style={styles.card}>
+              <View style={styles.profileRow}>
+                {/* Avatar circle */}
+                <View style={styles.avatarCircle}>
+                  <Text style={styles.avatarText}>{initials}</Text>
+                </View>
+                <View style={styles.profileInfo}>
+                  <Text style={styles.profileName} numberOfLines={1}>
+                    {profile?.name ?? (language === "uk" ? "Мій акаунт" : "My account")}
+                  </Text>
+                  <Text style={styles.profileEmail} numberOfLines={1}>
+                    {user.email}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <Pressable onPress={handleLogout} style={styles.logoutRow}>
+                <View style={[styles.dataIcon, { backgroundColor: "#FFF0F0" }]}>
+                  <Ionicons name="log-out-outline" size={22} color="#E74C3C" />
+                </View>
+                <View style={styles.dataInfo}>
+                  <Text style={[styles.dataTitle, { color: "#E74C3C" }]}>
+                    {language === "uk" ? "Вийти з акаунту" : "Sign out"}
+                  </Text>
+                  <Text style={styles.dataSub}>
+                    {language === "uk" ? "Ваші дані збережені в хмарі" : "Your data is saved in the cloud"}
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={18} color="#E74C3C" style={{ opacity: 0.6 }} />
+              </Pressable>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Language */}
         <Animated.View entering={FadeInDown.delay(100)}>
           <Text style={styles.sectionLabel}>{t.language}</Text>
@@ -259,8 +325,8 @@ export default function SettingsScreen() {
             <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
             <Text style={styles.infoText}>
               {language === "uk"
-                ? "Всі ваші дані зберігаються лише на вашому пристрої"
-                : "All your data is stored only on your device"}
+                ? "Ваші дані захищені та синхронізуються між пристроями через хмару"
+                : "Your data is secured and synced across devices via the cloud"}
             </Text>
           </View>
         </Animated.View>
@@ -283,6 +349,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderRadius: 18, overflow: "hidden", marginBottom: 12,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 12, elevation: 3,
   },
+  profileRow: { flexDirection: "row", alignItems: "center", padding: 16, gap: 14 },
+  avatarCircle: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: "#E8651A", alignItems: "center", justifyContent: "center",
+  },
+  avatarText: { fontSize: 20, fontFamily: "Inter_700Bold", color: "#FFFAF6" },
+  profileInfo: { flex: 1 },
+  profileName: { fontSize: 17, fontFamily: "Inter_700Bold", color: Colors.text },
+  profileEmail: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
+  logoutRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 14 },
   langRow: { flexDirection: "row", alignItems: "center", padding: 16, gap: 14 },
   langRowActive: { backgroundColor: Colors.primaryLight },
   flagText: { fontSize: 28 },

@@ -6,14 +6,16 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Redirect, Slot, Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   Platform,
   StyleSheet,
   Text,
+  View,
 } from "react-native";
 import Animated, {
   FadeOut,
@@ -28,6 +30,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PetsProvider } from "@/context/PetsContext";
 import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
+import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Colors } from "@/constants/colors";
 
 SplashScreen.preventAutoHideAsync();
@@ -38,13 +41,10 @@ function SimpleSplash({ onDone }: { onDone: () => void }) {
   const opacity = useSharedValue(0);
 
   useEffect(() => {
-    // Fade everything in smoothly over 900ms
     opacity.value = withTiming(1, {
       duration: 900,
       easing: Easing.out(Easing.quad),
     });
-
-    // Hold for a moment then hand off
     const timer = setTimeout(onDone, 2200);
     return () => clearTimeout(timer);
   }, []);
@@ -73,59 +73,95 @@ function SimpleSplash({ onDone }: { onDone: () => void }) {
   );
 }
 
+function AuthGuard({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === "(auth)";
+
+    if (!user && !inAuthGroup) {
+      router.replace("/(auth)/welcome");
+    } else if (user && inAuthGroup) {
+      router.replace("/(tabs)");
+    }
+  }, [user, isLoading, segments]);
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingRoot}>
+        <Image
+          source={require("../assets/logo.png")}
+          style={styles.logo}
+          resizeMode="contain"
+        />
+        <ActivityIndicator color="#E8651A" size="large" style={{ marginTop: 24 }} />
+      </View>
+    );
+  }
+
+  return <>{children}</>;
+}
+
 function RootLayoutNav() {
   const { t, language } = useLanguage();
 
   return (
-    <Stack
-      screenOptions={{
-        headerBackTitle: t.back,
-        headerStyle: { backgroundColor: Colors.surface },
-        headerTintColor: Colors.primary,
-        headerTitleStyle: {
-          fontFamily: "Inter_600SemiBold",
-          color: Colors.text,
-        },
-        contentStyle: { backgroundColor: Colors.background },
-      }}
-    >
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="pet/[id]"
-        options={{ title: t.profile, headerBackTitle: t.back }}
-      />
-      <Stack.Screen
-        name="pet/add"
-        options={{ title: t.addPetTitle, headerBackTitle: t.cancel, presentation: "modal" }}
-      />
-      <Stack.Screen
-        name="pet/vaccinations/[id]"
-        options={{ title: t.vaccinations, headerBackTitle: t.back }}
-      />
-      <Stack.Screen
-        name="pet/documents/[id]"
-        options={{ title: t.documents, headerBackTitle: t.back }}
-      />
-      <Stack.Screen
-        name="pet/add-vaccination/[id]"
-        options={{ title: t.addVaccination, presentation: "modal", headerBackTitle: t.cancel }}
-      />
-      <Stack.Screen
-        name="pet/edit/[id]"
-        options={{
-          title: language === "uk" ? "Редагувати" : "Edit Pet",
-          headerBackTitle: t.cancel,
-          presentation: "modal",
-        }}
-      />
-      <Stack.Screen
-        name="pet/weight/[id]"
-        options={{
-          title: language === "uk" ? "Журнал ваги" : "Weight Log",
+    <AuthGuard>
+      <Stack
+        screenOptions={{
           headerBackTitle: t.back,
+          headerStyle: { backgroundColor: Colors.surface },
+          headerTintColor: Colors.primary,
+          headerTitleStyle: {
+            fontFamily: "Inter_600SemiBold",
+            color: Colors.text,
+          },
+          contentStyle: { backgroundColor: Colors.background },
         }}
-      />
-    </Stack>
+      >
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="pet/[id]"
+          options={{ title: t.profile, headerBackTitle: t.back }}
+        />
+        <Stack.Screen
+          name="pet/add"
+          options={{ title: t.addPetTitle, headerBackTitle: t.cancel, presentation: "modal" }}
+        />
+        <Stack.Screen
+          name="pet/vaccinations/[id]"
+          options={{ title: t.vaccinations, headerBackTitle: t.back }}
+        />
+        <Stack.Screen
+          name="pet/documents/[id]"
+          options={{ title: t.documents, headerBackTitle: t.back }}
+        />
+        <Stack.Screen
+          name="pet/add-vaccination/[id]"
+          options={{ title: t.addVaccination, presentation: "modal", headerBackTitle: t.cancel }}
+        />
+        <Stack.Screen
+          name="pet/edit/[id]"
+          options={{
+            title: language === "uk" ? "Редагувати" : "Edit Pet",
+            headerBackTitle: t.cancel,
+            presentation: "modal",
+          }}
+        />
+        <Stack.Screen
+          name="pet/weight/[id]"
+          options={{
+            title: language === "uk" ? "Журнал ваги" : "Weight Log",
+            headerBackTitle: t.back,
+          }}
+        />
+      </Stack>
+    </AuthGuard>
   );
 }
 
@@ -162,13 +198,15 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <LanguageProvider>
-              <PetsProvider>
-                <AppProviders>
-                  <RootLayoutNav />
-                </AppProviders>
-              </PetsProvider>
-            </LanguageProvider>
+            <AuthProvider>
+              <LanguageProvider>
+                <PetsProvider>
+                  <AppProviders>
+                    <RootLayoutNav />
+                  </AppProviders>
+                </PetsProvider>
+              </LanguageProvider>
+            </AuthProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>
@@ -188,6 +226,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 40,
+  },
+  loadingRoot: {
+    flex: 1,
+    backgroundColor: "#FFFAF6",
+    alignItems: "center",
+    justifyContent: "center",
   },
   logo: {
     width: 200,
