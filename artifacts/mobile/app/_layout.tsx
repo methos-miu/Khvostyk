@@ -22,7 +22,7 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   return (
     <Stack
@@ -57,6 +57,14 @@ function RootLayoutNav() {
       <Stack.Screen
         name="pet/add-vaccination/[id]"
         options={{ title: t.addVaccination, presentation: "modal", headerBackTitle: t.cancel }}
+      />
+      <Stack.Screen
+        name="pet/edit/[id]"
+        options={{
+          title: language === "uk" ? "Редагувати" : "Edit pet",
+          headerBackTitle: t.cancel,
+          presentation: "modal",
+        }}
       />
     </Stack>
   );

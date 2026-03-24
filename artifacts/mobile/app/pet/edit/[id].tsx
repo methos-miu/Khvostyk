@@ -2,7 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
   Alert,
@@ -65,7 +65,6 @@ const ALL_SPECIES: { value: Species; icon: string }[] = [
   { value: "other", icon: "✨" },
 ];
 
-// Weight values: 0.1 to 100.0 in 0.1 steps (1000 items)
 const WEIGHT_VALUES = Array.from({ length: 1000 }, (_, i) =>
   ((i + 1) * 0.1).toFixed(1)
 );
@@ -90,23 +89,26 @@ function getBreedList(species: Species, lang: "uk" | "en"): string[] {
   }
 }
 
-export default function AddPetScreen() {
-  const { addPet } = usePets();
+export default function EditPetScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { getPet, updatePet } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [showBreedPicker, setShowBreedPicker] = useState(false);
   const [showWeightPicker, setShowWeightPicker] = useState(false);
 
+  const pet = getPet(id);
+
   const [form, setForm] = useState<FormData>({
-    name: "",
-    species: "dog",
-    breed: "",
-    birthdate: "",
-    weight: "",
-    color: "",
-    photoUri: "",
-    gender: null,
+    name: pet?.name ?? "",
+    species: pet?.species ?? "dog",
+    breed: pet?.breed ?? "",
+    birthdate: pet?.birthdate ?? "",
+    weight: pet?.weight ?? "",
+    color: pet?.color ?? "",
+    photoUri: pet?.photoUri ?? "",
+    gender: pet?.gender ?? null,
   });
 
   const updateForm = (key: keyof FormData, value: any) => {
@@ -161,10 +163,11 @@ export default function AddPetScreen() {
       Alert.alert("", t.errorBirthdate);
       return;
     }
+    if (!pet) return;
     setLoading(true);
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      await addPet({
+      await updatePet(pet.id, {
         name: form.name.trim(),
         species: form.species,
         breed: form.breed.trim(),
@@ -180,12 +183,20 @@ export default function AddPetScreen() {
     }
   };
 
+  if (!pet) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+        <Text style={{ color: Colors.textSecondary }}>Тварину не знайдено</Text>
+      </View>
+    );
+  }
+
   const breedList = getBreedList(form.species, language);
   const showBreedOption = form.species !== "other";
 
   const weightIndex = form.weight
     ? Math.max(0, WEIGHT_VALUES.indexOf(form.weight))
-    : 49; // default 5.0 kg
+    : 49;
 
   return (
     <KeyboardAvoidingView
@@ -325,7 +336,7 @@ export default function AddPetScreen() {
                 </>
               )}
 
-              {/* Birthdate — calendar picker */}
+              {/* Birthdate */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{t.birthdate} *</Text>
                 <DatePickerField
@@ -376,7 +387,7 @@ export default function AddPetScreen() {
             style={[styles.saveButton, loading && styles.saveButtonDisabled]}
           >
             <Text style={styles.saveButtonText}>
-              {loading ? t.saving : t.save}
+              {loading ? t.saving : language === "uk" ? "Зберегти зміни" : "Save changes"}
             </Text>
           </Pressable>
         </Animated.View>

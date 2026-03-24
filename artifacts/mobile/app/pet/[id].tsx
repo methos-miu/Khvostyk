@@ -5,7 +5,9 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect } from "react";
 import {
+  ActionSheetIOS,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,12 +17,12 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { PetAvatar } from "@/components/ui/PetAvatar";
 import { VaccinationBadge } from "@/components/ui/VaccinationBadge";
 import { Colors } from "@/constants/colors";
 import { usePets } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { calculateAge, formatDateShort, formatDate, getVaccinationStatus } from "@/utils/notifications";
+import { getSpeciesLabel } from "@/utils/speciesLabel";
+import { calculateAge, formatDateShort, formatDate } from "@/utils/notifications";
 
 const SPECIES_EMOJI: Record<string, string> = {
   cat: "🐈", dog: "🐕", rabbit: "🐇", hamster: "🐹",
@@ -37,37 +39,73 @@ export default function PetProfileScreen() {
 
   const pet = getPet(id);
 
+  const handleOptions = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const editLabel = language === "uk" ? "Редагувати" : "Edit";
+    const deleteLabel = language === "uk" ? "Видалити" : "Delete";
+    const cancelLabel = language === "uk" ? "Скасувати" : "Cancel";
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [cancelLabel, editLabel, deleteLabel],
+          destructiveButtonIndex: 2,
+          cancelButtonIndex: 0,
+        },
+        (index) => {
+          if (index === 1) {
+            router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } });
+          } else if (index === 2) {
+            confirmDelete();
+          }
+        }
+      );
+    } else {
+      Alert.alert(pet?.name ?? "", undefined, [
+        {
+          text: editLabel,
+          onPress: () => router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } }),
+        },
+        {
+          text: deleteLabel,
+          style: "destructive",
+          onPress: confirmDelete,
+        },
+        { text: cancelLabel, style: "cancel" },
+      ]);
+    }
+  };
+
+  const confirmDelete = () => {
+    Alert.alert(
+      `${language === "uk" ? "Видалити" : "Delete"} ${pet?.name}?`,
+      t.deletePetConfirm,
+      [
+        { text: t.cancel, style: "cancel" },
+        {
+          text: t.deletePet,
+          style: "destructive",
+          onPress: async () => {
+            await deletePet(pet!.id);
+            router.back();
+          },
+        },
+      ]
+    );
+  };
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title: pet?.name ?? t.profile,
       headerRight: () =>
         pet ? (
-          <Pressable
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              Alert.alert(
-                `${language === "uk" ? "Видалити" : "Delete"} ${pet.name}?`,
-                t.deletePetConfirm,
-                [
-                  { text: t.cancel, style: "cancel" },
-                  {
-                    text: t.deletePet,
-                    style: "destructive",
-                    onPress: async () => {
-                      await deletePet(pet.id);
-                      router.back();
-                    },
-                  },
-                ]
-              );
-            }}
-            style={{ marginRight: 4 }}
-          >
-            <Ionicons name="trash-outline" size={20} color={Colors.danger} />
+          <Pressable onPress={handleOptions} style={{ marginRight: 4, padding: 4 }}>
+            <Text style={styles.optionsBtn}>⋯</Text>
           </Pressable>
         ) : null,
     });
-  }, [pet, navigation, t]);
+  }, [pet, navigation, t, language]);
 
   if (!pet) {
     return (
@@ -82,7 +120,7 @@ export default function PetProfileScreen() {
     .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
     .slice(0, 3);
 
-  const speciesLabel = (t as any)[pet.species] ?? t.other;
+  const speciesLabel = getSpeciesLabel(pet.species, pet.gender, language);
   const age = calculateAge(pet.birthdate, language);
 
   return (
@@ -100,11 +138,6 @@ export default function PetProfileScreen() {
               ) : (
                 <View style={styles.heroEmojiWrap}>
                   <Text style={styles.heroEmoji}>{SPECIES_EMOJI[pet.species] ?? "🐾"}</Text>
-                </View>
-              )}
-              {pet.gender && (
-                <View style={[styles.genderBadge, pet.gender === "male" ? styles.genderMale : styles.genderFemale]}>
-                  <Ionicons name={pet.gender === "male" ? "male" : "female"} size={12} color={Colors.textLight} />
                 </View>
               )}
             </View>
@@ -268,6 +301,7 @@ const styles = StyleSheet.create({
   scrollContent: {},
   notFound: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   notFoundText: { fontSize: 16, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
+  optionsBtn: { fontSize: 24, color: Colors.text, fontWeight: "700", lineHeight: 26 },
   heroSection: { paddingTop: 24, paddingBottom: 32, paddingHorizontal: 20 },
   heroContent: { alignItems: "center" },
   heroAvatarWrap: {
@@ -281,13 +315,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center",
   },
   heroEmoji: { fontSize: 50 },
-  genderBadge: {
-    position: "absolute", bottom: 0, right: 0,
-    width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center",
-    borderWidth: 2.5, borderColor: Colors.primaryDark,
-  },
-  genderMale: { backgroundColor: "#2196F3" },
-  genderFemale: { backgroundColor: "#E91E63" },
   heroName: { fontSize: 28, fontFamily: "Inter_700Bold", color: Colors.textLight, marginBottom: 4 },
   heroBreed: { fontSize: 15, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.82)", marginBottom: 20 },
   heroStats: {

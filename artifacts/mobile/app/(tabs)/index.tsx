@@ -25,6 +25,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { Pet, usePets } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { getSpeciesLabel } from "@/utils/speciesLabel";
 import { calculateAge } from "@/utils/notifications";
 
 const SPECIES_EMOJI: Record<string, string> = {
@@ -60,17 +61,12 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
               <Text style={styles.speciesEmoji}>{SPECIES_EMOJI[pet.species] ?? "🐾"}</Text>
             </LinearGradient>
           )}
-          {pet.gender && (
-            <View style={[styles.genderBadge, pet.gender === "male" ? styles.genderMale : styles.genderFemale]}>
-              <Ionicons name={pet.gender === "male" ? "male" : "female"} size={10} color={Colors.textLight} />
-            </View>
-          )}
         </View>
 
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={1}>{pet.name}</Text>
           <Text style={styles.cardBreed} numberOfLines={1}>
-            {pet.breed || (t as any)[pet.species] || t.other}
+            {pet.breed || getSpeciesLabel(pet.species, pet.gender, language)}
           </Text>
           <View style={styles.cardMeta}>
             <View style={styles.agePill}>
