@@ -2,7 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { Platform } from "react-native";
 import { Session, User } from "@supabase/supabase-js";
 import * as WebBrowser from "expo-web-browser";
-import { makeRedirectUri } from "expo-auth-session";
+import * as Linking from "expo-linking";
 import { supabase } from "@/lib/supabase";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const isWeb = Platform.OS === "web";
       const redirectUri = isWeb
         ? (typeof window !== "undefined" ? window.location.origin + "/" : "")
-        : makeRedirectUri({ scheme: "mobile", path: "auth/callback" });
+        : Linking.createURL("auth/callback");
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
