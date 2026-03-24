@@ -38,6 +38,7 @@ import {
 import { Species, Gender, usePets } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { DatePickerField } from "@/components/ui/DatePickerField";
+import { BreedPickerModal } from "@/components/ui/BreedPickerModal";
 
 type FormData = {
   name: string;
@@ -382,52 +383,15 @@ export default function AddPetScreen() {
         </Animated.View>
       </ScrollView>
 
-      {/* Breed Picker Modal */}
-      <Modal
+      <BreedPickerModal
         visible={showBreedPicker}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setShowBreedPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <Animated.View entering={FadeInDown.springify()} style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t.selectBreed}</Text>
-              <Pressable onPress={() => setShowBreedPicker(false)}>
-                <Ionicons name="close-circle" size={28} color={Colors.textSecondary} />
-              </Pressable>
-            </View>
-            <FlatList
-              data={breedList}
-              keyExtractor={(item) => item}
-              showsVerticalScrollIndicator={false}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => {
-                    Haptics.selectionAsync();
-                    updateForm("breed", item);
-                    setShowBreedPicker(false);
-                  }}
-                  style={[
-                    styles.breedRow,
-                    form.breed === item && styles.breedRowActive,
-                  ]}
-                >
-                  <Text style={[styles.breedText, form.breed === item && styles.breedTextActive]}>
-                    {item}
-                  </Text>
-                  {form.breed === item && (
-                    <Ionicons name="checkmark" size={18} color={Colors.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-              ItemSeparatorComponent={() => <View style={styles.breedSeparator} />}
-              contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
-            />
-          </Animated.View>
-        </View>
-      </Modal>
+        onClose={() => setShowBreedPicker(false)}
+        breeds={breedList}
+        selectedBreed={form.breed}
+        onSelect={(breed) => updateForm("breed", breed)}
+        title={t.selectBreed}
+        language={language}
+      />
 
       {/* Weight Picker Modal */}
       <Modal

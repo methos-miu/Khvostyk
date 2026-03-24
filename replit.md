@@ -39,39 +39,49 @@ artifacts-monorepo/
 
 A pet health tracker app built with Expo SDK 53 / React Native.
 
-### Features
-- Pet list with large photo cards, species emoji, gender badges, age/weight pills
-- Add pet: 12 species types, gender selection (male/female), breed picker (top 30 cats + dogs in Ukraine), weight scroll-picker (0.5–100kg), date validation
-- Pet profile with gradient hero section, vaccination list, document list
-- Vaccinations with status badges (overdue/soon/upcoming/ok) and push notifications
-- Documents with action sheet: take photo / gallery / files
-- Reminders tab showing upcoming vaccinations sorted by urgency
-- Settings tab with 🇺🇦 Ukrainian ("Хвостик") / 🇬🇧 English ("Tailsy") language switcher
-- All data persisted with AsyncStorage
-- Supports Expo Go and production builds
+### Features (all implemented)
+1. Pet list with large photo cards, species emoji, gender badges, age/weight pills
+2. Add/edit pet: 12 species, gender, BreedPickerModal (searchable + custom input + alphabetically sorted), weight scroll-picker, DatePickerField (iOS inline calendar)
+3. Pet profile with gradient hero section, medical profile section (allergies, chronic conditions, vet name/phone), vaccination list, weight action shortcut
+4. Vaccinations with status badges (overdue/soon/upcoming/ok) and push notifications
+5. Documents with category picker (Аналізи/Рецепти/Страховка/Ветпаспорт/Інше) and filter chips
+6. Weight tracking screen with SVG line chart, weight log, weight picker
+7. Reminders tab with tabs (All/Vaccines/Others), birthday reminders (≤30 days), custom reminders (deworming/flea_tick/birthday/checkup)
+8. Settings tab with Ukrainian/English switcher + JSON backup export/import (expo-sharing/expo-document-picker)
+9. Birthday push notifications (day before + day of)
+10. Animated JS splash screen on app launch (🐾 logo, title, fade in)
+11. Data export/import: full JSON backup of all pets, vaccinations, documents, reminders, weight history
+12. `migratePet()` for backward compatibility with old data
 
 ### Key Files
 - `app/(tabs)/index.tsx` — Home/pets list
-- `app/(tabs)/reminders.tsx` — Reminders screen
-- `app/(tabs)/settings.tsx` — Settings + language switcher
+- `app/(tabs)/reminders.tsx` — Reminders with tabs, birthday + custom reminders
+- `app/(tabs)/settings.tsx` — Settings + language switcher + JSON backup
 - `app/(tabs)/_layout.tsx` — Tab bar layout (supports Liquid Glass on iOS 26+)
-- `app/_layout.tsx` — Root layout with all providers
-- `app/pet/add.tsx` — Add pet form (species grid, gender, breed picker, weight picker)
-- `app/pet/[id].tsx` — Pet profile screen
+- `app/_layout.tsx` — Root layout with animated splash screen + all Stack routes
+- `app/pet/add.tsx` — Add pet form
+- `app/pet/edit/[id].tsx` — Edit pet form
+- `app/pet/[id].tsx` — Pet profile with medical profile modal + quick actions
 - `app/pet/vaccinations/[id].tsx` — Vaccinations list
-- `app/pet/documents/[id].tsx` — Documents (photo/gallery/files action sheet)
+- `app/pet/documents/[id].tsx` — Documents with category filter
+- `app/pet/weight/[id].tsx` — Weight tracking with SVG chart
 - `app/pet/add-vaccination/[id].tsx` — Add vaccination form
-- `context/PetsContext.tsx` — All pet data (CRUD + AsyncStorage)
+- `components/ui/BreedPickerModal.tsx` — Searchable breed picker with custom input
+- `components/ui/DatePickerField.tsx` — iOS inline + Android calendar picker
+- `context/PetsContext.tsx` — Full pet data: CRUD + WeightEntry + Reminder + MedicalProfile + exportData/importData
 - `context/LanguageContext.tsx` — Language switcher (uk/en, persisted)
-- `constants/colors.ts` — App color palette
-- `constants/breeds.ts` — Top 30 cat + dog breeds (Ukrainian & English)
-- `utils/notifications.ts` — Date parsing (DD-MM-YYYY / YYYY-MM-DD), age calculation, push notifications
+- `constants/colors.ts` — App color palette (blue/white gradient)
+- `constants/breeds.ts` — All breed lists (12 species, UK+EN, sorted alphabetically)
+- `utils/notifications.ts` — Date parsing, age calc, push notifications, getNextBirthday
 
 ### Date Format
 - User inputs dates as `DD-MM-YYYY`
 - Stored internally as `YYYY-MM-DD` (ISO)
-- `parseDate()` handles both formats with validation (no NaN bugs)
+- `parseDate()` handles both formats with validation
 - `toISODate()` converts user input to ISO for storage
+
+### ID Generation
+- Never use `uuid` — use `Date.now().toString() + Math.random().toString(36).substr(2, 9)`
 
 ### Expo Go QR
 - URL: `exp://[REPLIT_EXPO_DEV_DOMAIN]`

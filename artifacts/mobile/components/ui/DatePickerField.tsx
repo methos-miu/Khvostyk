@@ -8,7 +8,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
@@ -41,45 +40,47 @@ function toISO(date: Date): string {
 
 export function DatePickerField({ value, onChange, placeholder, label }: Props) {
   const [showPicker, setShowPicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date | null>(null);
 
   const currentDate = parseDate(value) ?? new Date(2020, 0, 1);
   const displayValue = value ? toDisplayDate(value) : "";
 
-  const handleChange = (_event: DateTimePickerEvent, selected?: Date) => {
-    if (Platform.OS === "android") {
-      setShowPicker(false);
-    }
+  const handleAndroidChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    setShowPicker(false);
     if (selected) {
       onChange(toISO(selected));
       Haptics.selectionAsync();
     }
   };
 
-  const handleConfirm = (selected?: Date) => {
+  const handleIOSChange = (_event: DateTimePickerEvent, selected?: Date) => {
+    if (selected) setTempDate(selected);
+  };
+
+  const confirmIOS = () => {
+    const finalDate = tempDate ?? currentDate;
+    onChange(toISO(finalDate));
+    setTempDate(null);
     setShowPicker(false);
-    if (selected) {
-      onChange(toISO(selected));
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const cancelIOS = () => {
+    setTempDate(null);
+    setShowPicker(false);
   };
 
   if (Platform.OS === "web") {
     return (
-      <View style={styles.webRow}>
-        <TextInput
-          style={styles.webInput}
-          value={displayValue}
-          onChangeText={(v) => {
-            const d = parseDate(v);
-            if (d) onChange(toISO(d));
-            else onChange(v);
-          }}
-          placeholder={placeholder ?? "DD.MM.YYYY"}
-          placeholderTextColor={Colors.textTertiary}
-          keyboardType="numbers-and-punctuation"
-        />
-        <Ionicons name="calendar-outline" size={18} color={Colors.textTertiary} />
-      </View>
+      <Pressable
+        style={styles.fieldButton}
+        onPress={() => setShowPicker(!showPicker)}
+      >
+        <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
+          {displayValue || (placeholder ?? "Оберіть дату")}
+        </Text>
+        <Ionicons name="calendar" size={18} color={Colors.primary} />
+      </Pressable>
     );
   }
 
@@ -105,19 +106,20 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
             display="default"
             maximumDate={new Date()}
             minimumDate={new Date(1924, 0, 1)}
-            onChange={handleChange}
+            onChange={handleAndroidChange}
           />
         )}
       </>
     );
   }
 
-  // iOS
+  // iOS — uses "inline" calendar view for best visibility
   return (
     <>
       <Pressable
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          setTempDate(null);
           setShowPicker(true);
         }}
         style={styles.fieldButton}
@@ -132,29 +134,33 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
         visible={showPicker}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowPicker(false)}
+        onRequestClose={cancelIOS}
       >
         <View style={styles.modalOverlay}>
           <Animated.View entering={FadeInDown.springify()} style={styles.modalSheet}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
-              <Pressable onPress={() => setShowPicker(false)}>
+              <Pressable onPress={cancelIOS} style={styles.modalBtn}>
                 <Text style={styles.cancelBtn}>Скасувати</Text>
               </Pressable>
-              <Text style={styles.modalTitle}>{label ?? "Дата"}</Text>
-              <Pressable onPress={() => handleConfirm(currentDate)}>
+              <Text style={styles.modalTitle}>{label ?? "Дата народження"}</Text>
+              <Pressable onPress={confirmIOS} style={styles.modalBtn}>
                 <Text style={styles.confirmBtn}>Готово</Text>
               </Pressable>
             </View>
-            <DateTimePicker
-              value={currentDate}
-              mode="date"
-              display="spinner"
-              maximumDate={new Date()}
-              minimumDate={new Date(1924, 0, 1)}
-              onChange={handleChange}
-              style={styles.picker}
-            />
+            <View style={styles.calendarContainer}>
+              <DateTimePicker
+                value={tempDate ?? currentDate}
+                mode="date"
+                display="inline"
+                maximumDate={new Date()}
+                minimumDate={new Date(1924, 0, 1)}
+                onChange={handleIOSChange}
+                themeVariant="light"
+                accentColor={Colors.primary}
+                style={styles.inlinePicker}
+              />
+            </View>
           </Animated.View>
         </View>
       </Modal>
@@ -167,7 +173,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 0,
   },
   fieldText: {
     fontSize: 15,
@@ -178,63 +183,64 @@ const styles = StyleSheet.create({
   fieldPlaceholder: {
     color: Colors.textTertiary,
   },
-  webRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  webInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    color: Colors.text,
-    padding: 0,
-  },
   modalOverlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalSheet: {
-    backgroundColor: Colors.surface,
+    backgroundColor: "#FFFFFF",
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   modalHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: Colors.border,
+    backgroundColor: "#E0E0E0",
     alignSelf: "center",
     marginTop: 12,
+    marginBottom: 4,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: "#F0F0F0",
+  },
+  modalBtn: {
+    padding: 8,
+    minWidth: 80,
   },
   modalTitle: {
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: Colors.text,
+    color: "#1A1A1A",
+    flex: 1,
+    textAlign: "center",
   },
   cancelBtn: {
     fontSize: 15,
     fontFamily: "Inter_400Regular",
-    color: Colors.textSecondary,
+    color: "#666666",
+    textAlign: "center",
   },
   confirmBtn: {
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
     color: Colors.primary,
+    textAlign: "right",
   },
-  picker: {
+  calendarContainer: {
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 8,
+  },
+  inlinePicker: {
     width: "100%",
-    height: 200,
+    backgroundColor: "#FFFFFF",
   },
 });

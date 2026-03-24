@@ -8,20 +8,13 @@ import React, {
 } from "react";
 
 export type Species =
-  | "cat"
-  | "dog"
-  | "rabbit"
-  | "hamster"
-  | "guinea_pig"
-  | "bird"
-  | "turtle"
-  | "reptile"
-  | "fish"
-  | "ferret"
-  | "hedgehog"
-  | "other";
+  | "cat" | "dog" | "rabbit" | "hamster" | "guinea_pig"
+  | "bird" | "turtle" | "reptile" | "fish" | "ferret"
+  | "hedgehog" | "other";
 
 export type Gender = "male" | "female" | null;
+export type ReminderType = "deworming" | "flea_tick" | "birthday" | "checkup";
+export type DocumentCategory = "analysis" | "prescription" | "insurance" | "passport" | "other";
 
 export interface Vaccination {
   id: string;
@@ -30,6 +23,7 @@ export interface Vaccination {
   nextDate: string;
   notes?: string;
   vetName?: string;
+  notificationId?: string;
 }
 
 export interface Document {
@@ -39,6 +33,29 @@ export interface Document {
   type: string;
   date: string;
   size?: number;
+  category?: DocumentCategory;
+}
+
+export interface WeightEntry {
+  id: string;
+  date: string;
+  weight: number;
+}
+
+export interface Reminder {
+  id: string;
+  type: ReminderType;
+  date: string;
+  nextDate: string;
+  notes?: string;
+  notificationId?: string;
+}
+
+export interface MedicalProfile {
+  allergies?: string;
+  chronicConditions?: string;
+  vetName?: string;
+  vetPhone?: string;
 }
 
 export interface Pet {
@@ -53,12 +70,15 @@ export interface Pet {
   gender?: Gender;
   vaccinations: Vaccination[];
   documents: Document[];
+  weightHistory: WeightEntry[];
+  reminders: Reminder[];
+  medicalProfile?: MedicalProfile;
   createdAt: string;
 }
 
 interface PetsContextType {
   pets: Pet[];
-  addPet: (pet: Omit<Pet, "id" | "createdAt" | "vaccinations" | "documents">) => Promise<Pet>;
+  addPet: (pet: Omit<Pet, "id" | "createdAt" | "vaccinations" | "documents" | "weightHistory" | "reminders">) => Promise<Pet>;
   updatePet: (id: string, updates: Partial<Pet>) => Promise<void>;
   deletePet: (id: string) => Promise<void>;
   addVaccination: (petId: string, vaccination: Omit<Vaccination, "id">) => Promise<void>;
@@ -66,8 +86,15 @@ interface PetsContextType {
   deleteVaccination: (petId: string, vaccinationId: string) => Promise<void>;
   addDocument: (petId: string, document: Omit<Document, "id">) => Promise<void>;
   deleteDocument: (petId: string, documentId: string) => Promise<void>;
+  addWeightEntry: (petId: string, entry: Omit<WeightEntry, "id">) => Promise<void>;
+  deleteWeightEntry: (petId: string, entryId: string) => Promise<void>;
+  addReminder: (petId: string, reminder: Omit<Reminder, "id">) => Promise<void>;
+  updateReminder: (petId: string, reminderId: string, updates: Partial<Reminder>) => Promise<void>;
+  deleteReminder: (petId: string, reminderId: string) => Promise<void>;
   getPet: (id: string) => Pet | undefined;
   isLoaded: boolean;
+  exportData: () => string;
+  importData: (json: string) => Promise<boolean>;
 }
 
 const PetsContext = createContext<PetsContextType | null>(null);
@@ -76,6 +103,26 @@ const STORAGE_KEY = "@vethelper_pets";
 
 function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
+function migratePet(raw: any): Pet {
+  return {
+    id: raw.id ?? generateId(),
+    name: raw.name ?? "",
+    species: raw.species ?? "other",
+    breed: raw.breed ?? "",
+    birthdate: raw.birthdate ?? "",
+    weight: raw.weight ?? "",
+    photoUri: raw.photoUri,
+    color: raw.color,
+    gender: raw.gender ?? null,
+    vaccinations: raw.vaccinations ?? [],
+    documents: raw.documents ?? [],
+    weightHistory: raw.weightHistory ?? [],
+    reminders: raw.reminders ?? [],
+    medicalProfile: raw.medicalProfile,
+    createdAt: raw.createdAt ?? new Date().toISOString(),
+  };
 }
 
 export function PetsProvider({ children }: { children: React.ReactNode }) {
@@ -89,7 +136,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   const loadPets = async () => {
     try {
       const data = await AsyncStorage.getItem(STORAGE_KEY);
-      if (data) setPets(JSON.parse(data));
+      if (data) {
+        const parsed = JSON.parse(data);
+        setPets(Array.isArray(parsed) ? parsed.map(migratePet) : []);
+      }
     } catch (e) {
       console.error("Failed to load pets", e);
     } finally {
@@ -106,13 +156,15 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addPet = useCallback(
-    async (petData: Omit<Pet, "id" | "createdAt" | "vaccinations" | "documents">) => {
+    async (petData: Omit<Pet, "id" | "createdAt" | "vaccinations" | "documents" | "weightHistory" | "reminders">) => {
       const newPet: Pet = {
         ...petData,
         id: generateId(),
         createdAt: new Date().toISOString(),
         vaccinations: [],
         documents: [],
+        weightHistory: [],
+        reminders: [],
       };
       const updated = [...pets, newPet];
       setPets(updated);
@@ -203,25 +255,102 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     [pets]
   );
 
+  const addWeightEntry = useCallback(
+    async (petId: string, entry: Omit<WeightEntry, "id">) => {
+      const newEntry: WeightEntry = { ...entry, id: generateId() };
+      const updated = pets.map((p) =>
+        p.id === petId
+          ? { ...p, weightHistory: [...(p.weightHistory ?? []), newEntry] }
+          : p
+      );
+      setPets(updated);
+      await savePets(updated);
+    },
+    [pets]
+  );
+
+  const deleteWeightEntry = useCallback(
+    async (petId: string, entryId: string) => {
+      const updated = pets.map((p) =>
+        p.id === petId
+          ? { ...p, weightHistory: (p.weightHistory ?? []).filter((e) => e.id !== entryId) }
+          : p
+      );
+      setPets(updated);
+      await savePets(updated);
+    },
+    [pets]
+  );
+
+  const addReminder = useCallback(
+    async (petId: string, reminder: Omit<Reminder, "id">) => {
+      const newR: Reminder = { ...reminder, id: generateId() };
+      const updated = pets.map((p) =>
+        p.id === petId ? { ...p, reminders: [...(p.reminders ?? []), newR] } : p
+      );
+      setPets(updated);
+      await savePets(updated);
+    },
+    [pets]
+  );
+
+  const updateReminder = useCallback(
+    async (petId: string, reminderId: string, updates: Partial<Reminder>) => {
+      const updated = pets.map((p) =>
+        p.id === petId
+          ? { ...p, reminders: (p.reminders ?? []).map((r) => r.id === reminderId ? { ...r, ...updates } : r) }
+          : p
+      );
+      setPets(updated);
+      await savePets(updated);
+    },
+    [pets]
+  );
+
+  const deleteReminder = useCallback(
+    async (petId: string, reminderId: string) => {
+      const updated = pets.map((p) =>
+        p.id === petId
+          ? { ...p, reminders: (p.reminders ?? []).filter((r) => r.id !== reminderId) }
+          : p
+      );
+      setPets(updated);
+      await savePets(updated);
+    },
+    [pets]
+  );
+
   const getPet = useCallback(
     (id: string) => pets.find((p) => p.id === id),
     [pets]
   );
 
+  const exportData = useCallback((): string => {
+    return JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), pets }, null, 2);
+  }, [pets]);
+
+  const importData = useCallback(async (json: string): Promise<boolean> => {
+    try {
+      const parsed = JSON.parse(json);
+      const petsData: Pet[] = (parsed.pets ?? parsed).map(migratePet);
+      setPets(petsData);
+      await savePets(petsData);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   return (
     <PetsContext.Provider
       value={{
-        pets,
-        addPet,
-        updatePet,
-        deletePet,
-        addVaccination,
-        updateVaccination,
-        deleteVaccination,
-        addDocument,
-        deleteDocument,
-        getPet,
-        isLoaded,
+        pets, addPet, updatePet, deletePet,
+        addVaccination, updateVaccination, deleteVaccination,
+        addDocument, deleteDocument,
+        addWeightEntry, deleteWeightEntry,
+        addReminder, updateReminder, deleteReminder,
+        getPet, isLoaded,
+        exportData, importData,
       }}
     >
       {children}
