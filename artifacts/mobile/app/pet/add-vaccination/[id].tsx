@@ -107,7 +107,7 @@ export default function AddVaccinationScreen() {
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: Colors.background }}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
         contentContainerStyle={[
@@ -115,6 +115,7 @@ export default function AddVaccinationScreen() {
           { paddingBottom: insets.bottom + 24 },
         ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Швидкий вибір</Text>

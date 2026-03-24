@@ -7,6 +7,7 @@ import React, { useLayoutEffect, useState } from "react";
 import {
   ActionSheetIOS,
   Alert,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -336,7 +337,10 @@ export default function PetProfileScreen() {
 
       {/* Medical profile edit modal */}
       <Modal visible={showMedicalModal} transparent animationType="slide" onRequestClose={() => setShowMedicalModal(false)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
@@ -390,7 +394,7 @@ export default function PetProfileScreen() {
               />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </>
   );
