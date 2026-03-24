@@ -16,6 +16,10 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.vethelper.app",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      },
       "infoPlist": {
         "NSCameraUsageDescription": "Для фото вашої тварини",
         "NSPhotoLibraryUsageDescription": "Для вибору фото вашої тварини",
@@ -44,6 +48,7 @@
       ],
       "expo-font",
       "expo-web-browser",
+      "expo-apple-authentication",
       [
         "expo-image-picker",
         {

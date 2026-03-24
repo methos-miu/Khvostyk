@@ -18,6 +18,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -131,6 +132,8 @@ export default function LoginScreen() {
               <Text style={styles.switchLink}>Зареєструватися</Text>
             </Pressable>
           </View>
+
+          <SocialAuthButtons />
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -176,7 +179,7 @@ const styles = StyleSheet.create({
   },
   cta: { paddingVertical: 17, alignItems: "center" },
   ctaText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#FFFAF6" },
-  switchRow: { flexDirection: "row", justifyContent: "center", marginTop: 8 },
+  switchRow: { flexDirection: "row", justifyContent: "center" },
   switchText: { fontSize: 14, fontFamily: "Inter_400Regular", color: "#7A5C40" },
   switchLink: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: "#E8651A" },
 });

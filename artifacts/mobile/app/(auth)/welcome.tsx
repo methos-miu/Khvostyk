@@ -6,12 +6,14 @@ import {
   Dimensions,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 
 const { height } = Dimensions.get("window");
 
@@ -37,13 +39,16 @@ export default function WelcomeScreen() {
           <Text style={styles.tagline}>Ваш помічник у догляді{"\n"}за домашніми улюбленцями</Text>
         </Animated.View>
 
-        {/* Decorative paw prints */}
         <Text style={[styles.paw, { bottom: 40, right: 30, opacity: 0.15, fontSize: 64 }]}>🐾</Text>
         <Text style={[styles.paw, { bottom: 80, left: 20, opacity: 0.1, fontSize: 44 }]}>🐾</Text>
       </LinearGradient>
 
-      {/* Bottom panel */}
-      <View style={[styles.panel, { paddingBottom: insets.bottom + 24 }]}>
+      {/* Bottom panel — scrollable so social buttons are reachable on small screens */}
+      <ScrollView
+        style={{ flex: 1, backgroundColor: "#FFFAF6" }}
+        contentContainerStyle={[styles.panel, { paddingBottom: insets.bottom + 24 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <View style={styles.featureRow}>
             {["💉 Вакцини", "📄 Документи", "⏰ Нагадування"].map(f => (
@@ -73,8 +78,10 @@ export default function WelcomeScreen() {
           >
             <Text style={styles.btnSecondaryText}>Вже є акаунт? Увійти</Text>
           </Pressable>
+
+          <SocialAuthButtons />
         </Animated.View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -82,7 +89,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFFAF6" },
   hero: {
-    height: height * 0.52,
+    height: height * 0.48,
     alignItems: "center",
     justifyContent: "center",
     gap: 12,
@@ -106,10 +113,9 @@ const styles = StyleSheet.create({
   },
   paw: { position: "absolute", fontFamily: "System" },
   panel: {
-    flex: 1, backgroundColor: "#FFFAF6",
-    paddingHorizontal: 24, paddingTop: 28, gap: 20,
+    paddingHorizontal: 24, paddingTop: 24, gap: 16,
   },
-  featureRow: { flexDirection: "row", gap: 8, marginBottom: 12, flexWrap: "wrap" },
+  featureRow: { flexDirection: "row", gap: 8, marginBottom: 10, flexWrap: "wrap" },
   featureChip: {
     backgroundColor: "#FFF0E3", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
     borderWidth: 1, borderColor: "#E8651A33",
@@ -118,7 +124,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14, fontFamily: "Inter_400Regular", color: "#7A5C40", lineHeight: 22,
   },
-  buttons: { gap: 12, marginTop: 4 },
+  buttons: { gap: 10 },
   btnPrimary: {
     borderRadius: 18, overflow: "hidden",
     shadowColor: "#E8651A", shadowOffset: { width: 0, height: 6 },
