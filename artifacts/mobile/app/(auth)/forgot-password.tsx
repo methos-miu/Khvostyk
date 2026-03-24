@@ -8,6 +8,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -58,12 +59,13 @@ export default function ForgotPasswordScreen() {
         <View style={{ width: 40 }} />
       </LinearGradient>
 
-      <Animated.View
-        entering={FadeInDown.delay(80).springify()}
-        style={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: insets.bottom + 40 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
         {sent ? (
-          <View style={styles.successCard}>
+          <Animated.View entering={FadeInDown.delay(40).springify()} style={styles.successCard}>
             <Text style={styles.successEmoji}>📧</Text>
             <Text style={styles.successTitle}>Лист надіслано!</Text>
             <Text style={styles.successText}>
@@ -74,9 +76,9 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.backToLoginText}>Повернутись до входу</Text>
               </LinearGradient>
             </Pressable>
-          </View>
+          </Animated.View>
         ) : (
-          <>
+          <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.content}>
             <Text style={styles.title}>Забули пароль?</Text>
             <Text style={styles.subtitle}>
               Введіть email пов'язаний з вашим акаунтом — ми надішлемо посилання для відновлення.
@@ -109,9 +111,13 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.ctaText}>{loading ? "Надсилаємо..." : "Надіслати посилання"}</Text>
               </LinearGradient>
             </Pressable>
-          </>
+
+            <Pressable onPress={() => router.back()} style={styles.backLink}>
+              <Text style={styles.backLinkText}>← Повернутись до входу</Text>
+            </Pressable>
+          </Animated.View>
         )}
-      </Animated.View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -123,7 +129,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 8, minWidth: 40 },
   headerTitle: { fontSize: 18, fontFamily: "Inter_600SemiBold", color: "#FFFAF6" },
-  content: { flex: 1, padding: 24, gap: 16 },
+  scroll: { padding: 24, flexGrow: 1 },
+  content: { gap: 16 },
   title: { fontSize: 26, fontFamily: "Inter_700Bold", color: "#3D1C02", marginTop: 8 },
   subtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: "#7A5C40", lineHeight: 21 },
   card: {
@@ -143,8 +150,10 @@ const styles = StyleSheet.create({
   },
   cta: { paddingVertical: 17, alignItems: "center" },
   ctaText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#FFFAF6" },
+  backLink: { alignItems: "center", paddingVertical: 8 },
+  backLinkText: { fontSize: 14, fontFamily: "Inter_500Medium", color: "#E8651A" },
   successCard: {
-    flex: 1, alignItems: "center", justifyContent: "center", gap: 16, paddingHorizontal: 8,
+    gap: 16, paddingTop: 60, alignItems: "center",
   },
   successEmoji: { fontSize: 72 },
   successTitle: { fontSize: 26, fontFamily: "Inter_700Bold", color: "#3D1C02" },
