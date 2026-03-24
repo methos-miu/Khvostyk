@@ -116,7 +116,7 @@ export default function PetProfileScreen() {
     .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
     .slice(0, 3);
 
-  const speciesLabel = getSpeciesLabel(pet.species, pet.gender, language);
+  const speciesLabel = getSpeciesLabel(pet.species, pet.gender, language, pet.customSpecies);
   const age = calculateAge(pet.birthdate, language);
   const latestWeight = (pet.weightHistory ?? []).length > 0
     ? [...pet.weightHistory].sort((a, b) => b.date.localeCompare(a.date))[0]

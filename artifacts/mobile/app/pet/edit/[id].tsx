@@ -43,6 +43,7 @@ import { BreedPickerModal } from "@/components/ui/BreedPickerModal";
 type FormData = {
   name: string;
   species: Species;
+  customSpecies: string;
   breed: string;
   birthdate: string;
   weight: string;
@@ -104,6 +105,7 @@ export default function EditPetScreen() {
   const [form, setForm] = useState<FormData>({
     name: pet?.name ?? "",
     species: pet?.species ?? "dog",
+    customSpecies: pet?.customSpecies ?? "",
     breed: pet?.breed ?? "",
     birthdate: pet?.birthdate ?? "",
     weight: pet?.weight ?? "",
@@ -164,6 +166,10 @@ export default function EditPetScreen() {
       Alert.alert("", t.errorBirthdate);
       return;
     }
+    if (form.species === "other" && !form.customSpecies.trim()) {
+      Alert.alert("", language === "uk" ? "Вкажіть назву тварини" : "Please enter the animal name");
+      return;
+    }
     if (!pet) return;
     setLoading(true);
     try {
@@ -171,6 +177,7 @@ export default function EditPetScreen() {
       await updatePet(pet.id, {
         name: form.name.trim(),
         species: form.species,
+        customSpecies: form.species === "other" ? form.customSpecies.trim() : undefined,
         breed: form.breed.trim(),
         birthdate: form.birthdate,
         weight: form.weight.trim(),
@@ -236,6 +243,7 @@ export default function EditPetScreen() {
                     Haptics.selectionAsync();
                     updateForm("species", opt.value);
                     updateForm("breed", "");
+                    if (opt.value !== "other") updateForm("customSpecies", "");
                   }}
                   style={[
                     styles.speciesOption,
@@ -252,6 +260,23 @@ export default function EditPetScreen() {
                 </Pressable>
               ))}
             </View>
+
+            {form.species === "other" && (
+              <Animated.View entering={FadeInDown.duration(220).springify()} style={styles.customSpeciesBox}>
+                <Text style={styles.customSpeciesHint}>
+                  {language === "uk" ? "Введіть назву вашої тварини" : "Enter your pet's species"}
+                </Text>
+                <TextInput
+                  style={styles.customSpeciesInput}
+                  value={form.customSpecies}
+                  onChangeText={(v) => updateForm("customSpecies", v)}
+                  placeholder={language === "uk" ? "Яка тварина?" : "What animal?"}
+                  placeholderTextColor={Colors.textTertiary}
+                  autoFocus
+                  returnKeyType="done"
+                />
+              </Animated.View>
+            )}
           </View>
 
           {/* Gender */}
@@ -485,6 +510,26 @@ const styles = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 0.6, marginBottom: 10, marginLeft: 4,
   },
   speciesGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  customSpeciesBox: {
+    marginTop: 12,
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: Colors.primary,
+    gap: 6,
+  },
+  customSpeciesHint: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.primary,
+  },
+  customSpeciesInput: {
+    fontSize: 16,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+    padding: 0,
+  },
   speciesOption: {
     width: "22%",
     backgroundColor: Colors.surface, borderRadius: 14, padding: 10,

@@ -87,7 +87,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
         <View style={styles.cardInfo}>
           <Text style={styles.cardName} numberOfLines={1}>{pet.name}</Text>
           <Text style={styles.cardBreed} numberOfLines={1}>
-            {pet.breed || getSpeciesLabel(pet.species, pet.gender, language)}
+            {pet.breed || getSpeciesLabel(pet.species, pet.gender, language, pet.customSpecies)}
           </Text>
           <View style={styles.cardMeta}>
             <View style={styles.agePill}>

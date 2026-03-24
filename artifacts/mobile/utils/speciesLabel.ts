@@ -34,8 +34,12 @@ const EN_LABELS: Record<Species, { male: string; female: string; neutral: string
 export function getSpeciesLabel(
   species: Species,
   gender: Gender,
-  lang: "uk" | "en" = "uk"
+  lang: "uk" | "en" = "uk",
+  customSpecies?: string
 ): string {
+  if (species === "other" && customSpecies?.trim()) {
+    return customSpecies.trim();
+  }
   const map = lang === "uk" ? UK_LABELS : EN_LABELS;
   const entry = map[species] ?? map.other;
   if (gender === "male") return entry.male;

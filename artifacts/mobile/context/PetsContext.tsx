@@ -62,6 +62,7 @@ export interface Pet {
   id: string;
   name: string;
   species: Species;
+  customSpecies?: string;
   breed: string;
   birthdate: string;
   weight: string;
