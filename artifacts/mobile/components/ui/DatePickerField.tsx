@@ -13,6 +13,7 @@ import {
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import { Colors } from "@/constants/colors";
+import { useLanguage } from "@/context/LanguageContext";
 import { parseDate } from "@/utils/notifications";
 
 interface Props {
@@ -20,15 +21,24 @@ interface Props {
   onChange: (isoDate: string) => void;
   placeholder?: string;
   label?: string;
+  minimumDate?: Date;
+  maximumDate?: Date;
 }
 
-function toDisplayDate(isoDate: string): string {
+function toDisplayDate(isoDate: string, lang: "uk" | "en"): string {
   const d = parseDate(isoDate);
   if (!d) return "";
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const year = d.getFullYear();
-  return `${day}.${month}.${year}`;
+  try {
+    return new Intl.DateTimeFormat(lang === "uk" ? "uk-UA" : "en-GB", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+  } catch {
+    const day = String(d.getDate()).padStart(2, "0");
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    return `${day}.${month}.${d.getFullYear()}`;
+  }
 }
 
 function toISO(date: Date): string {
@@ -38,12 +48,18 @@ function toISO(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-export function DatePickerField({ value, onChange, placeholder, label }: Props) {
+const MIN_DATE = new Date(1924, 0, 1);
+
+export function DatePickerField({ value, onChange, placeholder, label, minimumDate, maximumDate }: Props) {
+  const { language } = useLanguage();
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date | null>(null);
 
-  const currentDate = parseDate(value) ?? new Date(2020, 0, 1);
-  const displayValue = value ? toDisplayDate(value) : "";
+  const currentDate = parseDate(value) ?? (maximumDate ? new Date(Math.min(maximumDate.getTime(), Date.now())) : new Date());
+  const displayValue = value ? toDisplayDate(value, language) : "";
+
+  const effectiveMin = minimumDate ?? MIN_DATE;
+  const effectiveMax = maximumDate;
 
   const handleAndroidChange = (_event: DateTimePickerEvent, selected?: Date) => {
     setShowPicker(false);
@@ -70,14 +86,15 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
     setShowPicker(false);
   };
 
+  const cancelLabel = language === "uk" ? "Скасувати" : "Cancel";
+  const confirmLabel = language === "uk" ? "Готово" : "Done";
+  const modalTitle = label ?? (language === "uk" ? "Оберіть дату" : "Select Date");
+
   if (Platform.OS === "web") {
     return (
-      <Pressable
-        style={styles.fieldButton}
-        onPress={() => setShowPicker(!showPicker)}
-      >
+      <Pressable style={styles.fieldButton} onPress={() => setShowPicker(!showPicker)}>
         <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
-          {displayValue || (placeholder ?? "Оберіть дату")}
+          {displayValue || (placeholder ?? (language === "uk" ? "Оберіть дату" : "Select date"))}
         </Text>
         <Ionicons name="calendar" size={18} color={Colors.primary} />
       </Pressable>
@@ -95,7 +112,7 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
           style={styles.fieldButton}
         >
           <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
-            {displayValue || (placeholder ?? "Оберіть дату")}
+            {displayValue || (placeholder ?? (language === "uk" ? "Оберіть дату" : "Select date"))}
           </Text>
           <Ionicons name="calendar" size={18} color={Colors.primary} />
         </Pressable>
@@ -104,8 +121,8 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
             value={currentDate}
             mode="date"
             display="default"
-            maximumDate={new Date()}
-            minimumDate={new Date(1924, 0, 1)}
+            maximumDate={effectiveMax}
+            minimumDate={effectiveMin}
             onChange={handleAndroidChange}
           />
         )}
@@ -113,7 +130,6 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
     );
   }
 
-  // iOS — uses "inline" calendar view for best visibility
   return (
     <>
       <Pressable
@@ -125,7 +141,7 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
         style={styles.fieldButton}
       >
         <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
-          {displayValue || (placeholder ?? "Оберіть дату")}
+          {displayValue || (placeholder ?? (language === "uk" ? "Оберіть дату" : "Select date"))}
         </Text>
         <Ionicons name="calendar" size={18} color={Colors.primary} />
       </Pressable>
@@ -141,11 +157,11 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
             <View style={styles.modalHandle} />
             <View style={styles.modalHeader}>
               <Pressable onPress={cancelIOS} style={styles.modalBtn}>
-                <Text style={styles.cancelBtn}>Скасувати</Text>
+                <Text style={styles.cancelBtn}>{cancelLabel}</Text>
               </Pressable>
-              <Text style={styles.modalTitle}>{label ?? "Дата народження"}</Text>
+              <Text style={styles.modalTitle}>{modalTitle}</Text>
               <Pressable onPress={confirmIOS} style={styles.modalBtn}>
-                <Text style={styles.confirmBtn}>Готово</Text>
+                <Text style={styles.confirmBtn}>{confirmLabel}</Text>
               </Pressable>
             </View>
             <View style={styles.calendarContainer}>
@@ -153,8 +169,8 @@ export function DatePickerField({ value, onChange, placeholder, label }: Props) 
                 value={tempDate ?? currentDate}
                 mode="date"
                 display="inline"
-                maximumDate={new Date()}
-                minimumDate={new Date(1924, 0, 1)}
+                maximumDate={effectiveMax}
+                minimumDate={effectiveMin}
                 onChange={handleIOSChange}
                 themeVariant="light"
                 accentColor={Colors.primary}

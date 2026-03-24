@@ -16,7 +16,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
+import { DatePickerField } from "@/components/ui/DatePickerField";
 import { usePets } from "@/context/PetsContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { scheduleVaccinationReminder, requestNotificationPermissions } from "@/utils/notifications";
 
 type FormData = {
@@ -42,6 +44,7 @@ const COMMON_VACCINES = [
 export default function AddVaccinationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPet, addVaccination } = usePets();
+  const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
 
@@ -158,25 +161,23 @@ export default function AddVaccinationScreen() {
             <View style={styles.divider} />
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Дата вакцинації *</Text>
-              <TextInput
-                style={styles.input}
+              <DatePickerField
                 value={form.date}
-                onChangeText={(v) => updateForm("date", v)}
-                placeholder="РРРР-ММ-ДД"
-                placeholderTextColor={Colors.textTertiary}
-                keyboardType="numbers-and-punctuation"
+                onChange={(iso) => updateForm("date", iso)}
+                placeholder={language === "uk" ? "Оберіть дату вакцинації" : "Select vaccination date"}
+                label={language === "uk" ? "Дата вакцинації" : "Vaccination Date"}
+                maximumDate={new Date()}
               />
             </View>
             <View style={styles.divider} />
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Наступна вакцинація *</Text>
-              <TextInput
-                style={styles.input}
+              <DatePickerField
                 value={form.nextDate}
-                onChangeText={(v) => updateForm("nextDate", v)}
-                placeholder="РРРР-ММ-ДД"
-                placeholderTextColor={Colors.textTertiary}
-                keyboardType="numbers-and-punctuation"
+                onChange={(iso) => updateForm("nextDate", iso)}
+                placeholder={language === "uk" ? "Оберіть дату наступної вакцинації" : "Select next vaccination date"}
+                label={language === "uk" ? "Наступна вакцинація" : "Next Vaccination"}
+                minimumDate={new Date()}
               />
             </View>
           </View>

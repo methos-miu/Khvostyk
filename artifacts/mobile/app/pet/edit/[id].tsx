@@ -371,6 +371,7 @@ export default function EditPetScreen() {
                   onChange={(iso) => updateForm("birthdate", iso)}
                   placeholder={language === "uk" ? "Оберіть дату народження" : "Select birth date"}
                   label={t.birthdate}
+                  maximumDate={new Date()}
                 />
               </View>
               <View style={styles.divider} />

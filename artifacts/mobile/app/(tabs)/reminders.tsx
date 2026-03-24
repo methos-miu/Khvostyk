@@ -374,6 +374,7 @@ export default function RemindersScreen() {
                   onChange={setNextDate}
                   placeholder={language === "uk" ? "Оберіть дату" : "Select date"}
                   label={language === "uk" ? "Наступна дата" : "Next Date"}
+                  minimumDate={new Date()}
                 />
               </View>
 
