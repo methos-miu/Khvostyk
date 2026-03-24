@@ -1,0 +1,68 @@
+{
+  "expo": {
+    "name": "ВетПомічник",
+    "slug": "mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "mobile",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B6FEB"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.vethelper.app",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Для фото вашої тварини",
+        "NSPhotoLibraryUsageDescription": "Для вибору фото вашої тварини",
+        "NSUserNotificationsUsageDescription": "Для нагадувань про вакцинації"
+      }
+    },
+    "android": {
+      "package": "com.vethelper.app",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "POST_NOTIFICATIONS"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/images/icon.png"
+    },
+    "plugins": [
+      [
+        "expo-router",
+        {
+          "origin": "https://replit.com/"
+        }
+      ],
+      "expo-font",
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Для вибору фото вашої тварини",
+          "cameraPermission": "Для фото вашої тварини"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#1B6FEB",
+          "sounds": []
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}
