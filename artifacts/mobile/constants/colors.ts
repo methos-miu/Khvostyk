@@ -31,7 +31,8 @@ export const Colors = {
   tabBarInactive: "#B8957A",
   tabBarBackground: "#FFFFFF",
 
-  gradientStart: "#E8651A",
+  // Header gradient: deep warm brown (no orange)
+  gradientStart: "#52280D",
   gradientEnd: "#3D1C02",
 
   shadow: "rgba(61, 28, 2, 0.10)",

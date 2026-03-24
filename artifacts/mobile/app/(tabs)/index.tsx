@@ -159,7 +159,7 @@ export default function HomeScreen() {
           <View style={styles.emptyIllustration}>
             <Text style={styles.emptyIllustrationPaw}>🐾</Text>
             <LinearGradient
-              colors={[Colors.gradientStart, Colors.gradientEnd]}
+              colors={["#E8651A", "#C45215"]}
               style={styles.emptyIconGradient}
             >
               <Text style={styles.emptyIconEmoji}>🐕🐈</Text>
@@ -175,7 +175,7 @@ export default function HomeScreen() {
             style={styles.emptyButton}
           >
             <LinearGradient
-              colors={[Colors.gradientStart, Colors.gradientEnd]}
+              colors={["#E8651A", "#C45215"]}
               style={styles.emptyButtonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}

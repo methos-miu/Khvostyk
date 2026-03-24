@@ -273,7 +273,7 @@ export default function RemindersScreen() {
         {filteredItems.length === 0 ? (
           <Animated.View entering={FadeInDown.delay(200)} style={styles.emptyContainer}>
             <View style={styles.emptyIconWrap}>
-              <LinearGradient colors={[Colors.gradientStart, Colors.gradientEnd]} style={styles.emptyIconGradient}>
+              <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.emptyIconGradient}>
                 <Ionicons name="notifications" size={44} color={Colors.textLight} />
               </LinearGradient>
             </View>
