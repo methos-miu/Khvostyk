@@ -42,7 +42,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
   const age = calculateAge(pet.birthdate, language);
 
   return (
-    <Animated.View entering={FadeInDown.delay(index * 80).springify().damping(14)} style={animatedStyle}>
+    <Animated.View entering={FadeInDown.delay(index * 80).springify().damping(14)}>
       <AnimatedPressable
         onPressIn={() => { scale.value = withSpring(0.97); }}
         onPressOut={() => { scale.value = withSpring(1); }}
@@ -50,7 +50,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push({ pathname: "/pet/[id]", params: { id: pet.id } });
         }}
-        style={styles.card}
+        style={[styles.card, animatedStyle]}
       >
         <View style={styles.cardPhotoWrap}>
           {pet.photoUri ? (
