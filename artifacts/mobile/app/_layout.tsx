@@ -8,8 +8,9 @@ import {
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect } from "react";
 import {
+  Image,
   Platform,
   StyleSheet,
   Text,
@@ -26,6 +27,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { useState } from "react";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { PetsProvider } from "@/context/PetsContext";
@@ -36,44 +38,95 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
+const LOGO_SIZE = 210;
+const HALF = LOGO_SIZE / 2;
+
 function AnimatedSplash({ onDone }: { onDone: () => void }) {
-  const scale = useSharedValue(0.7);
-  const opacity = useSharedValue(0);
+  /*
+   * The logo image is split into two halves that slide in from opposite
+   * sides of the screen, meet in the middle, and reveal the complete
+   * tails-heart logo. Then the title and subtitle fade/slide in.
+   *
+   * Left half  → starts at translateX: -LOGO_SIZE  →  arrives at 0
+   * Right half → starts at translateX: +LOGO_SIZE  →  arrives at 0
+   *              (the right half uses marginLeft: -HALF to offset its image
+   *               so only the right portion is visible through its clipping View)
+   */
+  const leftX = useSharedValue(-LOGO_SIZE);
+  const rightX = useSharedValue(LOGO_SIZE);
+  const logoScale = useSharedValue(0.85);
+  const subtitleOpacity = useSharedValue(0);
 
   useEffect(() => {
-    opacity.value = withTiming(1, { duration: 400 });
-    scale.value = withSpring(1, { damping: 12, stiffness: 100 });
-    const timer = setTimeout(onDone, 1600);
+    const spring = { damping: 15, stiffness: 125 };
+
+    // Phase 1 (0–700ms): Tails slide in from sides with a natural spring bounce
+    leftX.value = withSpring(0, spring);
+    rightX.value = withSpring(0, spring);
+    // Slight overshoot on the overall logo gives it a "snap together" feel
+    logoScale.value = withSpring(1, { damping: 11, stiffness: 100 });
+
+    // Phase 2 (900ms): Subtitle fades in
+    subtitleOpacity.value = withDelay(880, withTiming(1, { duration: 500 }));
+
+    const timer = setTimeout(onDone, 2600);
     return () => clearTimeout(timer);
   }, []);
 
-  const logoStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-    opacity: opacity.value,
+  const leftStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: leftX.value }],
+  }));
+  const rightStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: rightX.value }],
+  }));
+  const logoContainerStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: logoScale.value }],
+  }));
+  const subtitleStyle = useAnimatedStyle(() => ({
+    opacity: subtitleOpacity.value,
   }));
 
   return (
     <Animated.View
-      entering={FadeIn.duration(200)}
-      exiting={FadeOut.duration(350)}
-      style={styles.splashContainer}
+      entering={FadeIn.duration(120)}
+      exiting={FadeOut.duration(500)}
+      style={styles.splashRoot}
     >
-      <Animated.View style={logoStyle}>
-        <View style={styles.splashLogoCircle}>
-          <Text style={styles.splashEmoji}>🐾</Text>
+      {/* Decorative paw watermarks */}
+      <Text style={styles.pawTL}>🐾</Text>
+      <Text style={styles.pawBR}>🐾</Text>
+
+      {/* Two-halves logo animation */}
+      <Animated.View style={[styles.logoOuter, logoContainerStyle]}>
+        {/* Left half — clipped to HALF width, shows left side of logo */}
+        <View style={styles.logoHalfLeft}>
+          <Animated.View style={leftStyle}>
+            <Image
+              source={require("../assets/logo.png")}
+              style={styles.logoImage}
+              resizeMode="cover"
+            />
+          </Animated.View>
         </View>
-        <Text style={styles.splashTitle}>Хвостик</Text>
-        <Text style={styles.splashSubtitle}>Tailsy</Text>
+
+        {/* Right half — clipped to HALF width, shows right side of logo.
+            marginLeft: -HALF shifts the image left so only the right
+            portion falls inside the clipping container. */}
+        <View style={styles.logoHalfRight}>
+          <Animated.View style={[{ marginLeft: -HALF }, rightStyle]}>
+            <Image
+              source={require("../assets/logo.png")}
+              style={styles.logoImage}
+              resizeMode="cover"
+            />
+          </Animated.View>
+        </View>
       </Animated.View>
-      <View style={styles.splashDots}>
-        {[0, 1, 2].map(i => (
-          <Animated.View
-            key={i}
-            entering={FadeIn.delay(600 + i * 120)}
-            style={styles.splashDot}
-          />
-        ))}
-      </View>
+
+      {/* Subtitle — the logo image already contains "ХВОСТИК" text with paw */}
+      <Animated.Text style={[styles.splashSubtitle, subtitleStyle]}>
+        Додаток здоров'я домашніх улюбленців
+      </Animated.Text>
     </Animated.View>
   );
 }
@@ -182,48 +235,56 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  splashContainer: {
+  splashRoot: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: Colors.gradientStart,
+    backgroundColor: "#FFFAF6",
     alignItems: "center",
     justifyContent: "center",
     zIndex: 9999,
   },
-  splashLogoCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 20,
-    borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.3)",
+  pawTL: {
+    position: "absolute",
+    top: 60,
+    left: 28,
+    fontSize: 36,
+    opacity: 0.12,
+    transform: [{ rotate: "-30deg" }],
   },
-  splashEmoji: { fontSize: 56 },
-  splashTitle: {
-    fontSize: 38,
-    fontFamily: "Inter_700Bold",
-    color: "#FFFFFF",
-    textAlign: "center",
+  pawBR: {
+    position: "absolute",
+    bottom: 100,
+    right: 28,
+    fontSize: 36,
+    opacity: 0.12,
+    transform: [{ rotate: "20deg" }],
+  },
+  logoOuter: {
+    flexDirection: "row",
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
+    marginBottom: 28,
+  },
+  logoHalfLeft: {
+    width: HALF,
+    height: LOGO_SIZE,
+    overflow: "hidden",
+  },
+  logoHalfRight: {
+    width: HALF,
+    height: LOGO_SIZE,
+    overflow: "hidden",
+  },
+  logoImage: {
+    width: LOGO_SIZE,
+    height: LOGO_SIZE,
   },
   splashSubtitle: {
-    fontSize: 16,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.7)",
+    color: "#7A5C40",
     textAlign: "center",
-    marginTop: 4,
-  },
-  splashDots: {
-    flexDirection: "row",
-    gap: 8,
-    position: "absolute",
-    bottom: 80,
-  },
-  splashDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "rgba(255,255,255,0.6)",
+    marginTop: 10,
+    paddingHorizontal: 50,
+    lineHeight: 20,
   },
 });

@@ -53,14 +53,35 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
         }}
         style={[styles.card, animatedStyle]}
       >
+        {/* Decorative paw watermark in corner */}
+        <Text style={styles.cardPawWatermark}>🐾</Text>
+
         <View style={styles.cardPhotoWrap}>
           {pet.photoUri ? (
             <Image source={{ uri: pet.photoUri }} style={styles.cardPhoto} contentFit="cover" />
           ) : (
-            <LinearGradient colors={[Colors.gradientStart, Colors.gradientEnd]} style={styles.cardPhotoPlaceholder}>
+            <LinearGradient
+              colors={[Colors.gradientStart, Colors.gradientEnd]}
+              style={styles.cardPhotoPlaceholder}
+            >
               <Text style={styles.speciesEmoji}>{SPECIES_EMOJI[pet.species] ?? "🐾"}</Text>
             </LinearGradient>
           )}
+          {/* Gender badge */}
+          {pet.gender ? (
+            <View
+              style={[
+                styles.genderBadge,
+                pet.gender === "male" ? styles.genderMale : styles.genderFemale,
+              ]}
+            >
+              <Ionicons
+                name={pet.gender === "male" ? "male" : "female"}
+                size={10}
+                color="#fff"
+              />
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.cardInfo}>
@@ -81,7 +102,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
           </View>
           {pet.vaccinations.length > 0 && (
             <View style={styles.vaccinationChip}>
-              <Ionicons name="shield-checkmark" size={12} color="#4CAF50" />
+              <Ionicons name="shield-checkmark" size={12} color={Colors.accentGreen} />
               <Text style={styles.vaccinationChipText}>
                 {pet.vaccinations.length} {language === "uk" ? "вакц." : "vacc."}
               </Text>
@@ -108,10 +129,14 @@ export default function HomeScreen() {
         style={[styles.header, { paddingTop: topInset + 12 }]}
       >
         <Animated.View entering={FadeInUp.delay(50)} style={styles.headerContent}>
-          <View>
+          <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>{t.appName}</Text>
             <Text style={styles.headerSubtitle}>
-              {pets.length === 0 ? t.noPetsSubtitle : pets.length === 1 ? t.onePet : t.manyPets(pets.length)}
+              {pets.length === 0
+                ? t.noPetsSubtitle
+                : pets.length === 1
+                ? t.onePet
+                : t.manyPets(pets.length)}
             </Text>
           </View>
           <Animated.View entering={FadeInRight.delay(100)}>
@@ -130,9 +155,14 @@ export default function HomeScreen() {
 
       {pets.length === 0 ? (
         <Animated.View entering={FadeInDown.delay(200)} style={styles.emptyContainer}>
-          <View style={styles.emptyIconWrap}>
-            <LinearGradient colors={[Colors.gradientStart, Colors.gradientEnd]} style={styles.emptyIconGradient}>
-              <Ionicons name="paw" size={44} color={Colors.textLight} />
+          {/* Cute illustrated empty state */}
+          <View style={styles.emptyIllustration}>
+            <Text style={styles.emptyIllustrationPaw}>🐾</Text>
+            <LinearGradient
+              colors={[Colors.gradientStart, Colors.gradientEnd]}
+              style={styles.emptyIconGradient}
+            >
+              <Text style={styles.emptyIconEmoji}>🐕🐈</Text>
             </LinearGradient>
           </View>
           <Text style={styles.emptyTitle}>{t.noPets}</Text>
@@ -179,58 +209,209 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 24 },
-  headerContent: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  headerTitle: { fontSize: 28, fontFamily: "Inter_700Bold", color: Colors.textLight },
-  headerSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.78)", marginTop: 2 },
+  headerContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerLeft: { flex: 1 },
+  headerTitle: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: Colors.textLight,
+    letterSpacing: 0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.78)",
+    marginTop: 2,
+  },
   addButton: {
-    width: 46, height: 46, borderRadius: 23,
-    backgroundColor: "rgba(255,255,255,0.22)", alignItems: "center", justifyContent: "center",
-    borderWidth: 1, borderColor: "rgba(255,255,255,0.3)",
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "rgba(255,255,255,0.22)",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.3)",
   },
   listContent: { padding: 16 },
   listHeader: { marginBottom: 12 },
-  listHeaderText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary, textTransform: "uppercase", letterSpacing: 0.6, marginLeft: 4 },
+  listHeaderText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+    marginLeft: 4,
+  },
   card: {
-    backgroundColor: Colors.surface, borderRadius: 20, marginBottom: 12,
-    flexDirection: "row", alignItems: "center", padding: 14,
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1, shadowRadius: 14, elevation: 4,
+    backgroundColor: Colors.surface,
+    borderRadius: 22,
+    marginBottom: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 14,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    overflow: "hidden",
+  },
+  cardPawWatermark: {
+    position: "absolute",
+    top: 8,
+    right: 36,
+    fontSize: 22,
+    opacity: 0.06,
+    transform: [{ rotate: "15deg" }],
   },
   cardPhotoWrap: { position: "relative", marginRight: 14 },
   cardPhoto: { width: 70, height: 70, borderRadius: 18 },
-  cardPhotoPlaceholder: { width: 70, height: 70, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  cardPhotoPlaceholder: {
+    width: 70,
+    height: 70,
+    borderRadius: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   speciesEmoji: { fontSize: 30 },
   genderBadge: {
-    position: "absolute", bottom: -2, right: -2,
-    width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center",
-    borderWidth: 2, borderColor: Colors.surface,
+    position: "absolute",
+    bottom: -2,
+    right: -2,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: Colors.surface,
   },
-  genderMale: { backgroundColor: "#2196F3" },
+  genderMale: { backgroundColor: "#E8651A" },
   genderFemale: { backgroundColor: "#E91E63" },
   cardInfo: { flex: 1, gap: 4 },
   cardName: { fontSize: 17, fontFamily: "Inter_700Bold", color: Colors.text },
-  cardBreed: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  cardBreed: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+  },
   cardMeta: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 },
   agePill: {
-    flexDirection: "row", alignItems: "center", gap: 3,
-    backgroundColor: Colors.primaryLight, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
-  agePillText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.primary },
-  weightPill: { backgroundColor: Colors.background, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
-  weightPillText: { fontSize: 11, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
-  vaccinationChip: { flexDirection: "row", alignItems: "center", gap: 3, alignSelf: "flex-start", marginTop: 2 },
-  vaccinationChipText: { fontSize: 11, fontFamily: "Inter_500Medium", color: "#4CAF50" },
+  agePillText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.primary,
+  },
+  weightPill: {
+    backgroundColor: Colors.background,
+    borderRadius: 8,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  weightPillText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+  },
+  vaccinationChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    alignSelf: "flex-start",
+    marginTop: 2,
+  },
+  vaccinationChipText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: Colors.accentGreen,
+  },
   chevron: { marginLeft: 6 },
-  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 40 },
-  emptyIconWrap: {
-    marginBottom: 20, borderRadius: 40, overflow: "hidden",
-    shadowColor: Colors.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.25, shadowRadius: 16, elevation: 8,
+
+  /* Empty state */
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 40,
   },
-  emptyIconGradient: { width: 80, height: 80, borderRadius: 40, alignItems: "center", justifyContent: "center" },
-  emptyTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.text, marginBottom: 8, textAlign: "center" },
-  emptySubtitle: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", lineHeight: 22, marginBottom: 30 },
-  emptyButton: { borderRadius: 18, overflow: "hidden", shadowColor: Colors.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
-  emptyButtonGradient: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 28, paddingVertical: 16 },
-  emptyButtonText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.textLight },
+  emptyIllustration: {
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 24,
+    position: "relative",
+  },
+  emptyIllustrationPaw: {
+    position: "absolute",
+    top: -16,
+    right: -10,
+    fontSize: 24,
+    opacity: 0.3,
+    transform: [{ rotate: "20deg" }],
+  },
+  emptyIconGradient: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 2,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  emptyIconEmoji: { fontSize: 34 },
+  emptyTitle: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  emptySubtitle: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 22,
+    marginBottom: 32,
+  },
+  emptyButton: {
+    borderRadius: 18,
+    overflow: "hidden",
+    shadowColor: Colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  emptyButtonGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+  },
+  emptyButtonText: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textLight,
+  },
 });

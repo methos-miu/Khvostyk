@@ -49,7 +49,7 @@ A pet health tracker app built with Expo SDK 53 / React Native.
 7. Reminders tab with tabs (All/Vaccines/Others), birthday reminders (≤30 days), custom reminders (deworming/flea_tick/birthday/checkup)
 8. Settings tab with Ukrainian/English switcher + JSON backup export/import (expo-sharing/expo-document-picker)
 9. Birthday push notifications (day before + day of)
-10. Animated JS splash screen on app launch (🐾 logo, title, fade in)
+10. Animated JS splash screen: two logo halves slide in from opposite sides (cat tail left, dog tail right), snap together to form the heart, subtitle fades in. Total 2.6s. Disabled on web. Warm #FFFAF6 background with 🐾 watermarks.
 11. Data export/import: full JSON backup of all pets, vaccinations, documents, reminders, weight history
 12. `migratePet()` for backward compatibility with old data
 
@@ -70,7 +70,7 @@ A pet health tracker app built with Expo SDK 53 / React Native.
 - `components/ui/DatePickerField.tsx` — iOS inline + Android calendar picker
 - `context/PetsContext.tsx` — Full pet data: CRUD + WeightEntry + Reminder + MedicalProfile + exportData/importData
 - `context/LanguageContext.tsx` — Language switcher (uk/en, persisted)
-- `constants/colors.ts` — App color palette (blue/white gradient)
+- `constants/colors.ts` — App color palette: warm brand palette (orange #E8651A primary, dark brown #3D1C02 secondary, cream #FFFAF6 background)
 - `constants/breeds.ts` — All breed lists (12 species, UK+EN, sorted alphabetically)
 - `utils/notifications.ts` — Date parsing, age calc, push notifications, getNextBirthday
 

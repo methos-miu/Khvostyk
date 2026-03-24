@@ -1,38 +1,40 @@
 export const Colors = {
-  primary: "#1B6FEB",
-  primaryDark: "#0A4FBF",
-  primaryLight: "#EEF4FF",
-  accent: "#FF6B6B",
-  accentGreen: "#2DCE7A",
-  accentOrange: "#FF9F43",
-  accentPurple: "#A855F7",
+  primary: "#E8651A",
+  primaryDark: "#3D1C02",
+  primaryLight: "#FFF0E3",
+  secondary: "#3D1C02",
+  secondaryLight: "#F5E6D3",
+  accent: "#E8232A",
+  accentGreen: "#5A8C3E",
+  accentOrange: "#E8651A",
+  accentPurple: "#8B5E8C",
 
-  background: "#F5F7FF",
+  background: "#FFFAF6",
   surface: "#FFFFFF",
-  surfaceSecondary: "#F0F4FF",
+  surfaceSecondary: "#FFF5EE",
   card: "#FFFFFF",
 
-  text: "#0F1729",
-  textSecondary: "#6B7A99",
-  textTertiary: "#A0ABBE",
+  text: "#1A0A00",
+  textSecondary: "#7A5C40",
+  textTertiary: "#B8957A",
   textLight: "#FFFFFF",
 
-  border: "#E2E8F8",
-  borderLight: "#EEF2FF",
+  border: "#E8D5C0",
+  borderLight: "#F5E6D3",
 
-  success: "#2DCE7A",
-  warning: "#FF9F43",
-  danger: "#FF6B6B",
-  info: "#1B6FEB",
+  success: "#5A8C3E",
+  warning: "#E8651A",
+  danger: "#E8232A",
+  info: "#4A7BB5",
 
-  tabBarActive: "#1B6FEB",
-  tabBarInactive: "#A0ABBE",
+  tabBarActive: "#E8651A",
+  tabBarInactive: "#B8957A",
   tabBarBackground: "#FFFFFF",
 
-  gradientStart: "#1B6FEB",
-  gradientEnd: "#0A4FBF",
+  gradientStart: "#E8651A",
+  gradientEnd: "#3D1C02",
 
-  shadow: "rgba(27, 111, 235, 0.12)",
+  shadow: "rgba(61, 28, 2, 0.10)",
 };
 
 export default Colors;

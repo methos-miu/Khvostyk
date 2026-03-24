@@ -253,7 +253,7 @@ export default function AddPetScreen() {
                 }}
                 style={[styles.genderOption, form.gender === "male" && styles.genderMaleActive]}
               >
-                <Ionicons name="male" size={20} color={form.gender === "male" ? Colors.textLight : "#2196F3"} />
+                <Ionicons name="male" size={20} color={form.gender === "male" ? Colors.textLight : Colors.primary} />
                 <Text style={[styles.genderLabel, form.gender === "male" && styles.genderLabelActive]}>
                   {t.male}
                 </Text>
@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: 14,
     backgroundColor: Colors.surface, borderWidth: 2, borderColor: Colors.border,
   },
-  genderMaleActive: { backgroundColor: "#2196F3", borderColor: "#2196F3" },
+  genderMaleActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   genderFemaleActive: { backgroundColor: "#E91E63", borderColor: "#E91E63" },
   genderLabel: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary },
   genderLabelActive: { color: Colors.textLight },

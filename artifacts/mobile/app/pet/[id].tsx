@@ -200,7 +200,7 @@ export default function PetProfileScreen() {
                 <>
                   <View style={styles.divider} />
                   <View style={styles.infoRow}>
-                    <Ionicons name={pet.gender === "male" ? "male" : "female"} size={18} color={pet.gender === "male" ? "#2196F3" : "#E91E63"} />
+                    <Ionicons name={pet.gender === "male" ? "male" : "female"} size={18} color={pet.gender === "male" ? Colors.primary : "#E91E63"} />
                     <Text style={styles.infoLabel}>{t.gender}</Text>
                     <Text style={styles.infoValue}>{pet.gender === "male" ? t.male : t.female}</Text>
                   </View>

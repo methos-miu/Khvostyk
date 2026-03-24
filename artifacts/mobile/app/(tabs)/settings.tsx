@@ -176,8 +176,8 @@ export default function SettingsScreen() {
               disabled={exporting}
               style={styles.dataRow}
             >
-              <View style={[styles.dataIcon, { backgroundColor: "#EFF9FF" }]}>
-                <Ionicons name="cloud-upload-outline" size={22} color="#0EA5E9" />
+              <View style={[styles.dataIcon, { backgroundColor: Colors.primaryLight }]}>
+                <Ionicons name="cloud-upload-outline" size={22} color={Colors.primary} />
               </View>
               <View style={styles.dataInfo}>
                 <Text style={styles.dataTitle}>
