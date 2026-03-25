@@ -1,9 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -54,6 +55,16 @@ export function DatePickerField({ value, onChange, placeholder, label, minimumDa
   const { language } = useLanguage();
   const [showPicker, setShowPicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date | null>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) cancelIOS();
+      },
+    })
+  ).current;
 
   const currentDate = parseDate(value) ?? (maximumDate ? new Date(Math.min(maximumDate.getTime(), Date.now())) : new Date());
   const displayValue = value ? toDisplayDate(value, language) : "";
@@ -153,8 +164,11 @@ export function DatePickerField({ value, onChange, placeholder, label, minimumDa
         onRequestClose={cancelIOS}
       >
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={cancelIOS} />
           <Animated.View entering={FadeInDown.springify()} style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
+            <View {...panResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
             <View style={styles.modalHeader}>
               <Pressable onPress={cancelIOS} style={styles.modalBtn}>
                 <Text style={styles.cancelBtn}>{cancelLabel}</Text>
@@ -210,14 +224,16 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingBottom: 24,
   },
+  handleWrap: {
+    paddingTop: 12,
+    paddingBottom: 4,
+    alignItems: "center",
+  },
   modalHandle: {
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: "#E0E0E0",
-    alignSelf: "center",
-    marginTop: 12,
-    marginBottom: 4,
   },
   modalHeader: {
     flexDirection: "row",

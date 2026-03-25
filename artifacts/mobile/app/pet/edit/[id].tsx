@@ -3,12 +3,13 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -89,10 +90,10 @@ export default function EditPetScreen() {
   const [showBreedPicker, setShowBreedPicker] = useState(false);
   const [showWeightPicker, setShowWeightPicker] = useState(false);
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
+  const [selectedWeight, setSelectedWeight] = useState("5.0");
 
   const pet = getPet(id);
 
-  // Migrate legacy species codes (rabbit, hamster, etc.) → "other" + customSpecies key
   const initSpecies = (): Species => {
     if (!pet) return "cat";
     if (LEGACY_SPECIES.includes(pet.species)) return "other";
@@ -118,6 +119,39 @@ export default function EditPetScreen() {
 
   const updateForm = (key: keyof FormData, value: any) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const weightPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) setShowWeightPicker(false);
+      },
+    })
+  ).current;
+
+  const onWeightScrollEnd = (event: any) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(Math.round(offset / ITEM_HEIGHT), WEIGHT_VALUES.length - 1));
+    const newWeight = WEIGHT_VALUES[index];
+    if (newWeight !== selectedWeight) {
+      Haptics.selectionAsync();
+      setSelectedWeight(newWeight);
+    }
+  };
+
+  const openWeightPicker = () => {
+    const init = form.weight && WEIGHT_VALUES.includes(form.weight) ? form.weight : WEIGHT_VALUES[49];
+    setSelectedWeight(init);
+    setShowWeightPicker(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const confirmWeight = () => {
+    updateForm("weight", selectedWeight);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowWeightPicker(false);
   };
 
   const pickPhoto = async () => {
@@ -201,10 +235,7 @@ export default function EditPetScreen() {
 
   const breedList = getBreedList(form.species, language);
   const showBreedOption = form.species !== "other";
-
-  const weightIndex = form.weight
-    ? Math.max(0, WEIGHT_VALUES.indexOf(form.weight))
-    : 49;
+  const weightIndex = Math.max(0, WEIGHT_VALUES.indexOf(selectedWeight));
 
   return (
     <KeyboardAvoidingView
@@ -236,7 +267,6 @@ export default function EditPetScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.petType}</Text>
             <View style={styles.mainSpeciesRow}>
-              {/* Cat */}
               <Pressable
                 onPress={() => {
                   Haptics.selectionAsync();
@@ -252,7 +282,6 @@ export default function EditPetScreen() {
                 </Text>
               </Pressable>
 
-              {/* Dog */}
               <Pressable
                 onPress={() => {
                   Haptics.selectionAsync();
@@ -268,7 +297,6 @@ export default function EditPetScreen() {
                 </Text>
               </Pressable>
 
-              {/* Other — opens animal picker */}
               <Pressable
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -300,28 +328,18 @@ export default function EditPetScreen() {
             <Text style={styles.sectionTitle}>{t.gender}</Text>
             <View style={styles.genderRow}>
               <Pressable
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  updateForm("gender", form.gender === "male" ? null : "male");
-                }}
+                onPress={() => { Haptics.selectionAsync(); updateForm("gender", form.gender === "male" ? null : "male"); }}
                 style={[styles.genderOption, form.gender === "male" && styles.genderMaleActive]}
               >
                 <Ionicons name="male" size={20} color={form.gender === "male" ? Colors.textLight : Colors.primary} />
-                <Text style={[styles.genderLabel, form.gender === "male" && styles.genderLabelActive]}>
-                  {t.male}
-                </Text>
+                <Text style={[styles.genderLabel, form.gender === "male" && styles.genderLabelActive]}>{t.male}</Text>
               </Pressable>
               <Pressable
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  updateForm("gender", form.gender === "female" ? null : "female");
-                }}
+                onPress={() => { Haptics.selectionAsync(); updateForm("gender", form.gender === "female" ? null : "female"); }}
                 style={[styles.genderOption, form.gender === "female" && styles.genderFemaleActive]}
               >
                 <Ionicons name="female" size={20} color={form.gender === "female" ? Colors.textLight : "#E91E63"} />
-                <Text style={[styles.genderLabel, form.gender === "female" && styles.genderLabelActive]}>
-                  {t.female}
-                </Text>
+                <Text style={[styles.genderLabel, form.gender === "female" && styles.genderLabelActive]}>{t.female}</Text>
               </Pressable>
             </View>
           </View>
@@ -330,7 +348,6 @@ export default function EditPetScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>{t.basicInfo}</Text>
             <View style={styles.card}>
-              {/* Name */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{t.name} *</Text>
                 <TextInput
@@ -343,14 +360,10 @@ export default function EditPetScreen() {
               </View>
               <View style={styles.divider} />
 
-              {/* Breed */}
               {showBreedOption ? (
                 <>
                   <Pressable
-                    onPress={() => {
-                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                      setShowBreedPicker(true);
-                    }}
+                    onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowBreedPicker(true); }}
                     style={styles.inputGroup}
                   >
                     <Text style={styles.inputLabel}>{t.breed}</Text>
@@ -379,7 +392,6 @@ export default function EditPetScreen() {
                 </>
               )}
 
-              {/* Birthdate */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{t.birthdate} *</Text>
                 <DatePickerField
@@ -392,14 +404,7 @@ export default function EditPetScreen() {
               </View>
               <View style={styles.divider} />
 
-              {/* Weight picker */}
-              <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowWeightPicker(true);
-                }}
-                style={styles.inputGroup}
-              >
+              <Pressable onPress={openWeightPicker} style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{t.weight}</Text>
                 <View style={styles.pickerRow}>
                   <Text style={[styles.input, !form.weight && { color: Colors.textTertiary }]}>
@@ -410,7 +415,6 @@ export default function EditPetScreen() {
               </Pressable>
               <View style={styles.divider} />
 
-              {/* Color */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>{t.color}</Text>
                 <TextInput
@@ -424,7 +428,6 @@ export default function EditPetScreen() {
             </View>
           </View>
 
-          {/* Save */}
           <Pressable
             onPress={handleSave}
             disabled={loading}
@@ -473,12 +476,18 @@ export default function EditPetScreen() {
         onRequestClose={() => setShowWeightPicker(false)}
       >
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowWeightPicker(false)} />
           <Animated.View entering={FadeInDown.springify()} style={[styles.modalSheet, styles.weightModalSheet]}>
-            <View style={styles.modalHandle} />
+            <View {...weightPanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t.weightSelect}</Text>
               <Pressable onPress={() => setShowWeightPicker(false)}>
-                <Ionicons name="close-circle" size={28} color={Colors.textSecondary} />
+                <Text style={styles.modalCancel}>{language === "uk" ? "Скасувати" : "Cancel"}</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>{t.weightSelect}</Text>
+              <Pressable onPress={confirmWeight}>
+                <Text style={styles.modalSave}>{language === "uk" ? "Зберегти" : "Save"}</Text>
               </Pressable>
             </View>
             <View style={styles.weightPickerContainer}>
@@ -496,18 +505,16 @@ export default function EditPetScreen() {
                   offset: ITEM_HEIGHT * index,
                   index,
                 })}
+                onScrollEndDrag={onWeightScrollEnd}
+                onMomentumScrollEnd={onWeightScrollEnd}
                 renderItem={({ item }) => (
                   <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      updateForm("weight", item);
-                      setShowWeightPicker(false);
-                    }}
+                    onPress={() => { Haptics.selectionAsync(); setSelectedWeight(item); }}
                     style={styles.weightItem}
                   >
                     <Text style={[
                       styles.weightItemText,
-                      form.weight === item && styles.weightItemTextActive,
+                      selectedWeight === item && styles.weightItemTextActive,
                     ]}>
                       {item} кг
                     </Text>
@@ -554,10 +561,7 @@ const styles = StyleSheet.create({
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1, shadowRadius: 6, elevation: 2,
   },
-  mainSpeciesBtnActive: {
-    borderColor: Colors.primary,
-    backgroundColor: Colors.primaryLight,
-  },
+  mainSpeciesBtnActive: { borderColor: Colors.primary, backgroundColor: Colors.primaryLight },
   mainSpeciesEmoji: { fontSize: 30 },
   mainSpeciesLabel: {
     fontSize: 12, fontFamily: "Inter_600SemiBold",
@@ -592,30 +596,22 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: { opacity: 0.6 },
   saveButtonText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.textLight },
-  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
     maxHeight: "70%",
   },
   weightModalSheet: { maxHeight: "55%" },
-  modalHandle: {
-    width: 40, height: 4, borderRadius: 2,
-    backgroundColor: Colors.border, alignSelf: "center", marginTop: 12,
-  },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingVertical: 16,
+    paddingHorizontal: 16, paddingVertical: 14,
     borderBottomWidth: 1, borderBottomColor: Colors.border,
   },
-  modalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },
-  breedRow: {
-    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
-    paddingHorizontal: 20, paddingVertical: 15,
-  },
-  breedRowActive: { backgroundColor: Colors.primaryLight },
-  breedText: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text },
-  breedTextActive: { fontFamily: "Inter_600SemiBold", color: Colors.primary },
-  breedSeparator: { height: 1, backgroundColor: Colors.border, marginLeft: 20 },
+  modalTitle: { fontSize: 17, fontFamily: "Inter_700Bold", color: Colors.text },
+  modalCancel: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  modalSave: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.primary },
   weightPickerContainer: { position: "relative", height: 220 },
   weightSelectionBar: {
     position: "absolute", top: "50%", left: 0, right: 0,

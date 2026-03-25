@@ -89,6 +89,7 @@ export default function AddPetScreen() {
   const [showBreedPicker, setShowBreedPicker] = useState(false);
   const [showWeightPicker, setShowWeightPicker] = useState(false);
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
+  const [selectedWeight, setSelectedWeight] = useState("5.0");
 
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -179,9 +180,7 @@ export default function AddPetScreen() {
   const breedList = getBreedList(form.species, language);
   const showBreedOption = form.species !== "other";
 
-  const weightIndex = form.weight
-    ? Math.max(0, WEIGHT_VALUES.indexOf(form.weight))
-    : 49; // default 5.0 kg
+  const weightIndex = Math.max(0, WEIGHT_VALUES.indexOf(selectedWeight));
 
   const weightPanResponder = useRef(
     PanResponder.create({
@@ -197,10 +196,23 @@ export default function AddPetScreen() {
     const offset = event.nativeEvent.contentOffset.y;
     const index = Math.max(0, Math.min(Math.round(offset / ITEM_HEIGHT), WEIGHT_VALUES.length - 1));
     const newWeight = WEIGHT_VALUES[index];
-    if (newWeight !== form.weight) {
+    if (newWeight !== selectedWeight) {
       Haptics.selectionAsync();
-      updateForm("weight", newWeight);
+      setSelectedWeight(newWeight);
     }
+  };
+
+  const openWeightPicker = () => {
+    const init = form.weight && WEIGHT_VALUES.includes(form.weight) ? form.weight : WEIGHT_VALUES[49];
+    setSelectedWeight(init);
+    setShowWeightPicker(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const confirmWeight = () => {
+    updateForm("weight", selectedWeight);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowWeightPicker(false);
   };
 
   return (
@@ -391,10 +403,7 @@ export default function AddPetScreen() {
 
               {/* Weight picker */}
               <Pressable
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowWeightPicker(true);
-                }}
+                onPress={openWeightPicker}
                 style={styles.inputGroup}
               >
                 <Text style={styles.inputLabel}>{t.weight}</Text>
@@ -476,9 +485,12 @@ export default function AddPetScreen() {
               <View style={styles.modalHandle} />
             </View>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t.weightSelect}</Text>
               <Pressable onPress={() => setShowWeightPicker(false)}>
-                <Ionicons name="close-circle" size={28} color={Colors.textSecondary} />
+                <Text style={styles.modalCancel}>{language === "uk" ? "Скасувати" : "Cancel"}</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>{t.weightSelect}</Text>
+              <Pressable onPress={confirmWeight}>
+                <Text style={styles.modalSave}>{language === "uk" ? "Зберегти" : "Save"}</Text>
               </Pressable>
             </View>
             <View style={styles.weightPickerContainer}>
@@ -500,16 +512,12 @@ export default function AddPetScreen() {
                 onMomentumScrollEnd={onWeightScrollEnd}
                 renderItem={({ item }) => (
                   <Pressable
-                    onPress={() => {
-                      Haptics.selectionAsync();
-                      updateForm("weight", item);
-                      setShowWeightPicker(false);
-                    }}
+                    onPress={() => { Haptics.selectionAsync(); setSelectedWeight(item); }}
                     style={styles.weightItem}
                   >
                     <Text style={[
                       styles.weightItemText,
-                      form.weight === item && styles.weightItemTextActive,
+                      selectedWeight === item && styles.weightItemTextActive,
                     ]}>
                       {item} кг
                     </Text>
@@ -601,6 +609,8 @@ const styles = StyleSheet.create({
   },
   weightModalSheet: { maxHeight: "55%" },
   handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
+  modalCancel: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  modalSave: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.primary },
   modalHandle: {
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: Colors.border,

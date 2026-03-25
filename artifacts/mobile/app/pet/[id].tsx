@@ -3,12 +3,13 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useLayoutEffect, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   Alert,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -37,6 +38,16 @@ export default function PetProfileScreen() {
 
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
+
+  const medPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) setShowMedicalModal(false);
+      },
+    })
+  ).current;
 
   const pet = getPet(id);
 
@@ -173,7 +184,6 @@ export default function PetProfileScreen() {
         </Animated.View>
 
         <View style={styles.body}>
-          {/* Info card */}
           <Animated.View entering={FadeInDown.delay(80)}>
             <View style={styles.infoCard}>
               <Text style={styles.cardSectionTitle}>{t.details}</Text>
@@ -330,66 +340,68 @@ export default function PetProfileScreen() {
         </View>
       </ScrollView>
 
-      {/* Medical profile edit modal */}
+      {/* Medical profile modal — backdrop + KAV + swipe-to-close */}
       <Modal visible={showMedicalModal} transparent animationType="slide" onRequestClose={() => setShowMedicalModal(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setShowMedicalModal(false)}>
-                <Text style={styles.modalCancel}>{t.cancel}</Text>
-              </Pressable>
-              <Text style={styles.modalTitle}>{language === "uk" ? "Медичний профіль" : "Medical Profile"}</Text>
-              <Pressable onPress={saveMedical}>
-                <Text style={styles.modalSave}>{t.save.split(" ")[0]}</Text>
-              </Pressable>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowMedicalModal(false)} />
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.kavWrap}>
+            <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 20 }]}>
+              <View {...medPanResponder.panHandlers} style={styles.handleWrap}>
+                <View style={styles.modalHandle} />
+              </View>
+              <View style={styles.modalHeader}>
+                <Pressable onPress={() => setShowMedicalModal(false)}>
+                  <Text style={styles.modalCancel}>{t.cancel}</Text>
+                </Pressable>
+                <Text style={styles.modalTitle}>{language === "uk" ? "Медичний профіль" : "Medical Profile"}</Text>
+                <Pressable onPress={saveMedical}>
+                  <Text style={styles.modalSave}>{language === "uk" ? "Зберегти" : "Save"}</Text>
+                </Pressable>
+              </View>
+
+              <ScrollView contentContainerStyle={styles.medForm} keyboardShouldPersistTaps="handled">
+                <Text style={styles.medLabel}>{language === "uk" ? "Алергії" : "Allergies"}</Text>
+                <TextInput
+                  style={styles.medInput}
+                  value={medForm.allergies ?? ""}
+                  onChangeText={(v) => setMedForm(prev => ({ ...prev, allergies: v }))}
+                  placeholder={language === "uk" ? "Напр. куряче м'ясо, пилок" : "e.g. chicken, pollen"}
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                />
+
+                <Text style={styles.medLabel}>{language === "uk" ? "Хронічні хвороби" : "Chronic Conditions"}</Text>
+                <TextInput
+                  style={styles.medInput}
+                  value={medForm.chronicConditions ?? ""}
+                  onChangeText={(v) => setMedForm(prev => ({ ...prev, chronicConditions: v }))}
+                  placeholder={language === "uk" ? "Напр. діабет, артрит" : "e.g. diabetes, arthritis"}
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                />
+
+                <Text style={styles.medLabel}>{language === "uk" ? "Ім'я ветеринара" : "Vet Name"}</Text>
+                <TextInput
+                  style={styles.medInput}
+                  value={medForm.vetName ?? ""}
+                  onChangeText={(v) => setMedForm(prev => ({ ...prev, vetName: v }))}
+                  placeholder={language === "uk" ? "Лікар Петренко Олег" : "Dr. John Smith"}
+                  placeholderTextColor={Colors.textTertiary}
+                />
+
+                <Text style={styles.medLabel}>{language === "uk" ? "Телефон ветеринара" : "Vet Phone"}</Text>
+                <TextInput
+                  style={styles.medInput}
+                  value={medForm.vetPhone ?? ""}
+                  onChangeText={(v) => setMedForm(prev => ({ ...prev, vetPhone: v }))}
+                  placeholder="+380 xx xxx xx xx"
+                  placeholderTextColor={Colors.textTertiary}
+                  keyboardType="phone-pad"
+                />
+              </ScrollView>
             </View>
-
-            <ScrollView contentContainerStyle={styles.medForm} keyboardShouldPersistTaps="handled">
-              <Text style={styles.medLabel}>{language === "uk" ? "Алергії" : "Allergies"}</Text>
-              <TextInput
-                style={styles.medInput}
-                value={medForm.allergies ?? ""}
-                onChangeText={(v) => setMedForm(prev => ({ ...prev, allergies: v }))}
-                placeholder={language === "uk" ? "Напр. куряче м'ясо, пилок" : "e.g. chicken, pollen"}
-                placeholderTextColor={Colors.textTertiary}
-                multiline
-              />
-
-              <Text style={styles.medLabel}>{language === "uk" ? "Хронічні хвороби" : "Chronic Conditions"}</Text>
-              <TextInput
-                style={styles.medInput}
-                value={medForm.chronicConditions ?? ""}
-                onChangeText={(v) => setMedForm(prev => ({ ...prev, chronicConditions: v }))}
-                placeholder={language === "uk" ? "Напр. діабет, артрит" : "e.g. diabetes, arthritis"}
-                placeholderTextColor={Colors.textTertiary}
-                multiline
-              />
-
-              <Text style={styles.medLabel}>{language === "uk" ? "Ім'я ветеринара" : "Vet Name"}</Text>
-              <TextInput
-                style={styles.medInput}
-                value={medForm.vetName ?? ""}
-                onChangeText={(v) => setMedForm(prev => ({ ...prev, vetName: v }))}
-                placeholder={language === "uk" ? "Лікар Петренко Олег" : "Dr. John Smith"}
-                placeholderTextColor={Colors.textTertiary}
-              />
-
-              <Text style={styles.medLabel}>{language === "uk" ? "Телефон ветеринара" : "Vet Phone"}</Text>
-              <TextInput
-                style={styles.medInput}
-                value={medForm.vetPhone ?? ""}
-                onChangeText={(v) => setMedForm(prev => ({ ...prev, vetPhone: v }))}
-                placeholder="+380 xx xxx xx xx"
-                placeholderTextColor={Colors.textTertiary}
-                keyboardType="phone-pad"
-              />
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </>
   );
@@ -458,10 +470,12 @@ const styles = StyleSheet.create({
   actionButton: { flex: 1, borderRadius: 18, padding: 14, alignItems: "center", gap: 8 },
   actionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "center" },
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  kavWrap: { justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "80%",
   },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: "center", marginTop: 12 },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
