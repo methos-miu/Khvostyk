@@ -131,7 +131,7 @@ function RootLayoutNav() {
         />
         <Stack.Screen
           name="pet/add"
-          options={{ title: t.addPetTitle, headerBackTitle: t.cancel, presentation: "modal" }}
+          options={{ headerShown: false, presentation: "modal" }}
         />
         <Stack.Screen
           name="pet/vaccinations/[id]"
