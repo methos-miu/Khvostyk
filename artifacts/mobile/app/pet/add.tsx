@@ -224,8 +224,11 @@ export default function AddPetScreen() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: Colors.background }}>
-      {/* Top bar — fixed, never moves when keyboard appears */}
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: Colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      {/* Top bar */}
       <View style={styles.topBar}>
         <View style={styles.handleWrap}>
           <View style={styles.modalHandle} />
@@ -243,11 +246,6 @@ export default function AddPetScreen() {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
-      >
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 160 }]}
         showsVerticalScrollIndicator={false}
@@ -473,7 +471,6 @@ export default function AddPetScreen() {
           </Pressable>
         </Animated.View>
       </ScrollView>
-      </KeyboardAvoidingView>
 
       <BreedPickerModal
         visible={showBreedPicker}
@@ -560,7 +557,7 @@ export default function AddPetScreen() {
           </Animated.View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
