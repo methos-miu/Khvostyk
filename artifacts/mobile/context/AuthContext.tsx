@@ -156,7 +156,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithApple = useCallback(async () => {
     try {
-      const AppleAuthentication = await import("expo-apple-authentication");
+      // expo-apple-authentication works only in real builds, not Expo Go
+      // In Expo Go we show a friendly message
+      const { ExpoAppleAuthenticationModule } = await import("expo-modules-core")
+        .catch(() => ({ ExpoAppleAuthenticationModule: null }));
+
+      const AppleAuthentication = await import("expo-apple-authentication")
+        .catch(() => null);
+
+      if (!AppleAuthentication) {
+        return { error: "Apple Sign In доступний тільки в повній версії додатку" };
+      }
+
+      const isAvailable = await AppleAuthentication.isAvailableAsync().catch(() => false);
+      if (!isAvailable) {
+        return { error: "Apple Sign In недоступний на цьому пристрої" };
+      }
 
       const credential = await AppleAuthentication.signInAsync({
         requestedScopes: [

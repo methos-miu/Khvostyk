@@ -3,12 +3,13 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -181,6 +182,26 @@ export default function AddPetScreen() {
   const weightIndex = form.weight
     ? Math.max(0, WEIGHT_VALUES.indexOf(form.weight))
     : 49; // default 5.0 kg
+
+  const weightPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) setShowWeightPicker(false);
+      },
+    })
+  ).current;
+
+  const onWeightScrollEnd = (event: any) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(Math.round(offset / ITEM_HEIGHT), WEIGHT_VALUES.length - 1));
+    const newWeight = WEIGHT_VALUES[index];
+    if (newWeight !== form.weight) {
+      Haptics.selectionAsync();
+      updateForm("weight", newWeight);
+    }
+  };
 
   return (
     <KeyboardAvoidingView
@@ -449,8 +470,11 @@ export default function AddPetScreen() {
         onRequestClose={() => setShowWeightPicker(false)}
       >
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowWeightPicker(false)} />
           <Animated.View entering={FadeInDown.springify()} style={[styles.modalSheet, styles.weightModalSheet]}>
-            <View style={styles.modalHandle} />
+            <View {...weightPanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{t.weightSelect}</Text>
               <Pressable onPress={() => setShowWeightPicker(false)}>
@@ -472,6 +496,8 @@ export default function AddPetScreen() {
                   offset: ITEM_HEIGHT * index,
                   index,
                 })}
+                onScrollEndDrag={onWeightScrollEnd}
+                onMomentumScrollEnd={onWeightScrollEnd}
                 renderItem={({ item }) => (
                   <Pressable
                     onPress={() => {
@@ -574,9 +600,10 @@ const styles = StyleSheet.create({
     maxHeight: "70%",
   },
   weightModalSheet: { maxHeight: "55%" },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
   modalHandle: {
     width: 40, height: 4, borderRadius: 2,
-    backgroundColor: Colors.border, alignSelf: "center", marginTop: 12,
+    backgroundColor: Colors.border,
   },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

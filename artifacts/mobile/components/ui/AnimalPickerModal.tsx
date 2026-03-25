@@ -5,6 +5,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   SectionList,
@@ -41,6 +42,16 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
   const [query, setQuery] = useState("");
   const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) handleClose();
+      },
+    })
+  ).current;
 
   const sections = useMemo(() =>
     ANIMAL_CATEGORIES.map(cat => ({
@@ -90,16 +101,19 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
       transparent
       onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        style={styles.overlay}
-      >
+      <View style={styles.overlay}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={handleClose} />
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
         <Animated.View
           entering={FadeInDown.springify()}
           style={[styles.sheet, { paddingBottom: insets.bottom }]}
         >
           {/* Handle */}
-          <View style={styles.handle} />
+          <View {...panResponder.panHandlers} style={styles.handleWrap}>
+            <View style={styles.handle} />
+          </View>
 
           {/* Header */}
           <View style={styles.header}>
@@ -190,7 +204,8 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
             />
           )}
         </Animated.View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -208,10 +223,10 @@ const styles = StyleSheet.create({
     maxHeight: "92%",
     minHeight: "60%",
   },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
   handle: {
     width: 40, height: 4, borderRadius: 2,
     backgroundColor: Colors.border,
-    alignSelf: "center", marginTop: 10, marginBottom: 4,
   },
   header: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",

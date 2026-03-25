@@ -4,13 +4,14 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as Sharing from "expo-sharing";
 import { useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useLayoutEffect, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
   Image,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -300,6 +301,16 @@ export default function DocumentsScreen() {
 
   const pet = getPet(id);
 
+  const addModalPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) closeAddModal();
+      },
+    })
+  ).current;
+
   const openAddModal = (file: { uri: string; type: string; size?: number }) => {
     setPendingFile(file);
     setDocName("");
@@ -565,12 +576,15 @@ export default function DocumentsScreen() {
         transparent
         onRequestClose={closeAddModal}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.addModalOverlay}
-        >
+        <View style={styles.addModalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeAddModal} />
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
           <Animated.View entering={FadeInDown.springify()} style={[styles.addModalSheet, { paddingBottom: insets.bottom + 12 }]}>
-            <View style={styles.modalHandle} />
+            <View {...addModalPanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
 
             {/* Header */}
             <View style={styles.addModalHeader}>
@@ -663,7 +677,8 @@ export default function DocumentsScreen() {
               </Pressable>
             </ScrollView>
           </Animated.View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </>
   );
@@ -728,7 +743,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
     paddingHorizontal: 16, paddingTop: 8, maxHeight: "90%",
   },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: "center", marginBottom: 8 },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },
   addModalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
   addModalClose: { padding: 8 },
   addModalTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },

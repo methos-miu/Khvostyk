@@ -2,19 +2,19 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
@@ -69,10 +69,21 @@ export default function RemindersScreen() {
   const [notes, setNotes] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"all" | "vaccination" | "other">("all");
 
+  const closeModal = () => setShowAddModal(false);
+
+  const handlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) closeModal();
+      },
+    })
+  ).current;
+
   const reminderItems: ReminderItem[] = [];
 
   pets.forEach((pet) => {
-    // Vaccinations
     pet.vaccinations.forEach((vaccination) => {
       if (vaccination.nextDate) {
         reminderItems.push({
@@ -85,7 +96,6 @@ export default function RemindersScreen() {
       }
     });
 
-    // Birthday
     if (pet.birthdate) {
       const nextBd = getNextBirthday(pet.birthdate);
       if (nextBd) {
@@ -97,7 +107,6 @@ export default function RemindersScreen() {
       }
     }
 
-    // Custom reminders
     (pet.reminders ?? []).forEach((reminder) => {
       if (reminder.nextDate) {
         reminderItems.push({
@@ -140,7 +149,7 @@ export default function RemindersScreen() {
     }
     await addReminder(selectedPetId, { type: reminderType, date: new Date().toISOString().slice(0, 10), nextDate, notes });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setShowAddModal(false);
+    closeModal();
   };
 
   function ReminderCard({ item, index }: { item: ReminderItem; index: number }) {
@@ -254,7 +263,6 @@ export default function RemindersScreen() {
             )}
           </Animated.View>
 
-          {/* Tabs */}
           <View style={styles.tabs}>
             {(["all", "vaccination", "other"] as const).map(tab => (
               <Pressable key={tab} onPress={() => { Haptics.selectionAsync(); setActiveTab(tab); }}
@@ -319,78 +327,76 @@ export default function RemindersScreen() {
       </View>
 
       {/* Add reminder modal */}
-      <Modal visible={showAddModal} transparent animationType="slide" onRequestClose={() => setShowAddModal(false)}>
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-          <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalHeader}>
-              <Pressable onPress={() => setShowAddModal(false)}>
-                <Text style={styles.modalCancel}>{t.cancel}</Text>
-              </Pressable>
-              <Text style={styles.modalTitle}>
-                {language === "uk" ? "Нове нагадування" : "New Reminder"}
-              </Text>
-              <Pressable onPress={handleSaveReminder}>
-                <Text style={styles.modalSave}>{language === "uk" ? "Додати" : "Add"}</Text>
-              </Pressable>
-            </View>
-
-            <ScrollView contentContainerStyle={styles.addForm} keyboardShouldPersistTaps="handled">
-              {/* Pet picker */}
-              <Text style={styles.addLabel}>{language === "uk" ? "Тварина" : "Pet"}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petPickerScroll}>
-                {pets.map(pet => (
-                  <Pressable key={pet.id} onPress={() => setSelectedPetId(pet.id)}
-                    style={[styles.petChip, selectedPetId === pet.id && styles.petChipActive]}>
-                    <Text style={[styles.petChipText, selectedPetId === pet.id && styles.petChipTextActive]}>
-                      {pet.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-
-              {/* Reminder type */}
-              <Text style={[styles.addLabel, { marginTop: 16 }]}>{language === "uk" ? "Тип нагадування" : "Reminder Type"}</Text>
-              <View style={styles.typeGrid}>
-                {REMINDER_TYPES.map(rt => (
-                  <Pressable key={rt.type} onPress={() => { Haptics.selectionAsync(); setReminderType(rt.type); }}
-                    style={[styles.typeChip, { backgroundColor: rt.bg, borderColor: reminderType === rt.type ? rt.color : Colors.border }]}>
-                    <Ionicons name={rt.icon as any} size={18} color={rt.color} />
-                    <Text style={[styles.typeChipText, { color: rt.color }]}>
-                      {language === "uk" ? rt.iconUk : rt.iconEn}
-                    </Text>
-                  </Pressable>
-                ))}
+      <Modal visible={showAddModal} transparent animationType="slide" onRequestClose={closeModal}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
+          <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
+            <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
+              <View {...handlePanResponder.panHandlers} style={styles.handleWrap}>
+                <View style={styles.modalHandle} />
+              </View>
+              <View style={styles.modalHeader}>
+                <Pressable onPress={closeModal}>
+                  <Text style={styles.modalCancel}>{t.cancel}</Text>
+                </Pressable>
+                <Text style={styles.modalTitle}>
+                  {language === "uk" ? "Нове нагадування" : "New Reminder"}
+                </Text>
+                <Pressable onPress={handleSaveReminder}>
+                  <Text style={styles.modalSave}>{language === "uk" ? "Додати" : "Add"}</Text>
+                </Pressable>
               </View>
 
-              {/* Date picker */}
-              <Text style={[styles.addLabel, { marginTop: 16 }]}>{language === "uk" ? "Наступна дата" : "Next Date"}</Text>
-              <View style={styles.dateFieldWrap}>
-                <DatePickerField
-                  value={nextDate}
-                  onChange={setNextDate}
-                  placeholder={language === "uk" ? "Оберіть дату" : "Select date"}
-                  label={language === "uk" ? "Наступна дата" : "Next Date"}
-                  minimumDate={new Date()}
+              <ScrollView contentContainerStyle={styles.addForm} keyboardShouldPersistTaps="handled">
+                <Text style={styles.addLabel}>{language === "uk" ? "Тварина" : "Pet"}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.petPickerScroll}>
+                  {pets.map(pet => (
+                    <Pressable key={pet.id} onPress={() => setSelectedPetId(pet.id)}
+                      style={[styles.petChip, selectedPetId === pet.id && styles.petChipActive]}>
+                      <Text style={[styles.petChipText, selectedPetId === pet.id && styles.petChipTextActive]}>
+                        {pet.name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+
+                <Text style={[styles.addLabel, { marginTop: 16 }]}>{language === "uk" ? "Тип нагадування" : "Reminder Type"}</Text>
+                <View style={styles.typeGrid}>
+                  {REMINDER_TYPES.map(rt => (
+                    <Pressable key={rt.type} onPress={() => { Haptics.selectionAsync(); setReminderType(rt.type); }}
+                      style={[styles.typeChip, { backgroundColor: rt.bg, borderColor: reminderType === rt.type ? rt.color : Colors.border }]}>
+                      <Ionicons name={rt.icon as any} size={18} color={rt.color} />
+                      <Text style={[styles.typeChipText, { color: rt.color }]}>
+                        {language === "uk" ? rt.iconUk : rt.iconEn}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={[styles.addLabel, { marginTop: 16 }]}>{language === "uk" ? "Наступна дата" : "Next Date"}</Text>
+                <View style={styles.dateFieldWrap}>
+                  <DatePickerField
+                    value={nextDate}
+                    onChange={setNextDate}
+                    placeholder={language === "uk" ? "Оберіть дату" : "Select date"}
+                    label={language === "uk" ? "Наступна дата" : "Next Date"}
+                    minimumDate={new Date()}
+                  />
+                </View>
+
+                <Text style={[styles.addLabel, { marginTop: 16 }]}>{t.notes}</Text>
+                <TextInput
+                  style={styles.notesInput}
+                  value={notes}
+                  onChangeText={setNotes}
+                  placeholder={language === "uk" ? "Додаткові нотатки..." : "Additional notes..."}
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
                 />
-              </View>
-
-              {/* Notes */}
-              <Text style={[styles.addLabel, { marginTop: 16 }]}>{t.notes}</Text>
-              <TextInput
-                style={styles.notesInput}
-                value={notes}
-                onChangeText={setNotes}
-                placeholder={language === "uk" ? "Додаткові нотатки..." : "Additional notes..."}
-                placeholderTextColor={Colors.textTertiary}
-                multiline
-              />
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
+              </ScrollView>
+            </View>
+          </KeyboardAvoidingView>
+        </View>
       </Modal>
     </>
   );
@@ -407,10 +413,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", marginTop: 4,
   },
   tabs: { flexDirection: "row", gap: 8, marginBottom: 4 },
-  tab: {
-    paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.15)",
-  },
+  tab: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.15)" },
   tabActive: { backgroundColor: "rgba(255,255,255,0.95)" },
   tabText: { fontSize: 13, fontFamily: "Inter_500Medium", color: "rgba(255,255,255,0.8)" },
   tabTextActive: { color: Colors.primary, fontFamily: "Inter_600SemiBold" },
@@ -450,11 +453,12 @@ const styles = StyleSheet.create({
     borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 8,
   },
   addEmptyBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.textLight },
-  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "88%",
   },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: "center", marginTop: 12 },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,

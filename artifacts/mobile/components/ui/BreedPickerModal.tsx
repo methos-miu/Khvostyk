@@ -5,6 +5,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -44,6 +45,16 @@ export function BreedPickerModal({
   const [customBreed, setCustomBreed] = useState("");
   const [showCustomInput, setShowCustomInput] = useState(false);
   const listRef = useRef<FlatList>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) handleClose();
+      },
+    })
+  ).current;
 
   /*
    * Height budget for the list:
@@ -157,7 +168,9 @@ export function BreedPickerModal({
             style={[styles.sheet, { paddingBottom: insets.bottom + 12 }]}
           >
             {/* Drag handle */}
-            <View style={styles.handle} />
+            <View {...panResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.handle} />
+            </View>
 
             {/* Header row */}
             <View style={styles.header}>
@@ -337,14 +350,12 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
   },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
   handle: {
     width: 40,
     height: 4,
     borderRadius: 2,
     backgroundColor: Colors.border,
-    alignSelf: "center",
-    marginTop: 12,
-    marginBottom: 2,
   },
   header: {
     flexDirection: "row",

@@ -1,11 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useLayoutEffect, useState, useMemo } from "react";
+import React, { useLayoutEffect, useState, useMemo, useRef } from "react";
 import {
   Alert,
   FlatList,
   Modal,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -69,7 +70,6 @@ function WeightChart({ entries }: { entries: WeightEntry[] }) {
 
   return (
     <Svg width={WIDTH} height={HEIGHT}>
-      {/* Grid lines */}
       {[0, 0.5, 1].map((frac, i) => {
         const y = PADDING.top + innerH - frac * innerH;
         const val = (minW + frac * range).toFixed(1);
@@ -83,22 +83,14 @@ function WeightChart({ entries }: { entries: WeightEntry[] }) {
           </React.Fragment>
         );
       })}
-
-      {/* Gradient fill */}
       <Path d={gradientPathD} fill={`${Colors.primary}20`} />
-
-      {/* Line */}
       <Path d={pathD} stroke={Colors.primary} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-
-      {/* Points */}
       {points.map((p, i) => (
         <React.Fragment key={i}>
           <Circle cx={p.x} cy={p.y} r="5" fill={Colors.primary} />
           <Circle cx={p.x} cy={p.y} r="2.5" fill="white" />
         </React.Fragment>
       ))}
-
-      {/* X axis labels */}
       {points.filter((_, i) => i === 0 || i === Math.floor(points.length / 2) || i === points.length - 1).map((p, i) => (
         <SvgText key={i} x={p.x} y={HEIGHT - 4} fontSize="9" fill={Colors.textTertiary} textAnchor="middle">
           {formatShortDate(p.date)}
@@ -118,6 +110,26 @@ export default function WeightScreen() {
   const [selectedWeight, setSelectedWeight] = useState("5.0");
 
   const pet = getPet(id);
+
+  const handlePanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > 50) setShowPicker(false);
+      },
+    })
+  ).current;
+
+  const onPickerScrollEnd = (event: any) => {
+    const offset = event.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(Math.round(offset / ITEM_HEIGHT), WEIGHT_VALUES.length - 1));
+    const newWeight = WEIGHT_VALUES[index];
+    if (newWeight !== selectedWeight) {
+      Haptics.selectionAsync();
+      setSelectedWeight(newWeight);
+    }
+  };
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -162,7 +174,6 @@ export default function WeightScreen() {
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}>
-        {/* Chart */}
         {sorted.length >= 2 && (
           <Animated.View entering={FadeInDown.delay(60)} style={styles.chartCard}>
             <Text style={styles.chartTitle}>
@@ -190,7 +201,6 @@ export default function WeightScreen() {
           </Animated.View>
         )}
 
-        {/* History list */}
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>{language === "uk" ? "Журнал ваги" : "Weight Log"}</Text>
           <Text style={styles.listCount}>{sorted.length} {language === "uk" ? "записів" : "entries"}</Text>
@@ -243,8 +253,11 @@ export default function WeightScreen() {
       {/* Weight picker modal */}
       <Modal visible={showPicker} transparent animationType="slide" onRequestClose={() => setShowPicker(false)}>
         <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowPicker(false)} />
           <Animated.View entering={FadeInDown.springify()} style={[styles.modalSheet, { paddingBottom: insets.bottom + 12 }]}>
-            <View style={styles.modalHandle} />
+            <View {...handlePanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
             <View style={styles.modalHeader}>
               <Pressable onPress={() => setShowPicker(false)}>
                 <Text style={styles.modalCancel}>{t.cancel}</Text>
@@ -265,8 +278,13 @@ export default function WeightScreen() {
                 contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
                 initialScrollIndex={weightIndex >= 0 ? weightIndex : 49}
                 getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
+                onScrollEndDrag={onPickerScrollEnd}
+                onMomentumScrollEnd={onPickerScrollEnd}
                 renderItem={({ item }) => (
-                  <Pressable onPress={() => { Haptics.selectionAsync(); setSelectedWeight(item); }} style={styles.pickerItem}>
+                  <Pressable
+                    onPress={() => { Haptics.selectionAsync(); setSelectedWeight(item); }}
+                    style={styles.pickerItem}
+                  >
                     <Text style={[styles.pickerItemText, selectedWeight === item && styles.pickerItemActive]}>
                       {item} кг
                     </Text>
@@ -318,11 +336,12 @@ const styles = StyleSheet.create({
   entryDate: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
   diffBadge: { paddingHorizontal: 8, paddingVertical: 4, backgroundColor: Colors.background, borderRadius: 8 },
   diffText: { fontSize: 13, fontFamily: "Inter_600SemiBold" },
-  modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+  modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
   },
-  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border, alignSelf: "center", marginTop: 12 },
+  handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
+  modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },
   modalHeader: {
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
     paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: Colors.border,
