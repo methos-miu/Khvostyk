@@ -245,6 +245,8 @@ export default function AddPetScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
+        bounces={false}
+        overScrollMode="never"
       >
         <Animated.View entering={FadeIn.delay(80)}>
           {/* Photo */}
