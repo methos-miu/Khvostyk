@@ -3,10 +3,11 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -90,6 +91,13 @@ export default function AddPetScreen() {
   const [showWeightPicker, setShowWeightPicker] = useState(false);
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
   const [selectedWeight, setSelectedWeight] = useState("5.0");
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const [form, setForm] = useState<FormData>({
     name: "",
@@ -245,8 +253,8 @@ export default function AddPetScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-        bounces={false}
-        overScrollMode="never"
+        scrollEnabled={keyboardVisible}
+        bounces={true}
       >
         <Animated.View entering={FadeIn.delay(80)}>
           {/* Photo */}
