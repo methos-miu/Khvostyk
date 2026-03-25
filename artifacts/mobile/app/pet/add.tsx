@@ -220,6 +220,24 @@ export default function AddPetScreen() {
       style={{ flex: 1, backgroundColor: Colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      {/* Top bar — drag handle + Скасувати / Зберегти */}
+      <View style={styles.topBar}>
+        <View style={styles.handleWrap}>
+          <View style={styles.modalHandle} />
+        </View>
+        <View style={styles.modalHeader}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Text style={styles.modalCancel}>{language === "uk" ? "Скасувати" : "Cancel"}</Text>
+          </Pressable>
+          <Text style={styles.modalTitle}>{language === "uk" ? "Нова тварина" : "New Pet"}</Text>
+          <Pressable onPress={handleSave} disabled={loading} hitSlop={8}>
+            <Text style={[styles.modalSave, loading && { opacity: 0.4 }]}>
+              {language === "uk" ? "Зберегти" : "Save"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
@@ -533,6 +551,9 @@ export default function AddPetScreen() {
 }
 
 const styles = StyleSheet.create({
+  topBar: {
+    backgroundColor: Colors.surface,
+  },
   scrollContent: { padding: 20 },
   photoButton: { alignSelf: "center", marginBottom: 28, position: "relative" },
   photoPreview: { width: 110, height: 110, borderRadius: 55 },
