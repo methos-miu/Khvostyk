@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useState, useMemo, useRef } from "react";
 import {
@@ -33,7 +33,7 @@ function AnimalRow({ animal, onPress }: { animal: AnimalEntry; onPress: () => vo
     <Pressable onPress={onPress} style={({ pressed }) => [styles.animalRow, pressed && styles.animalRowPressed]}>
       <Text style={styles.animalEmoji}>{animal.emoji}</Text>
       <Text style={styles.animalName}>{animal.nameUk}</Text>
-      <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} />
+      <MaterialCommunityIcons name="chevron-right" size={16} color={Colors.textTertiary} />
     </Pressable>
   );
 }
@@ -118,7 +118,7 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
           {/* Header */}
           <View style={styles.header}>
             <Pressable onPress={handleClose} style={styles.headerCloseBtn}>
-              <Ionicons name="close" size={22} color={Colors.textSecondary} />
+              <MaterialCommunityIcons name="close" size={22} color={Colors.textSecondary} />
             </Pressable>
             <Text style={styles.headerTitle}>
               {language === "uk" ? "Оберіть тварину" : "Choose Animal"}
@@ -128,7 +128,7 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
 
           {/* Search bar */}
           <View style={styles.searchWrap}>
-            <Ionicons name="search" size={18} color={Colors.textTertiary} style={styles.searchIcon} />
+            <MaterialCommunityIcons name="magnify" size={18} color={Colors.textTertiary} style={styles.searchIcon} />
             <TextInput
               ref={inputRef}
               style={styles.searchInput}
@@ -142,7 +142,7 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
             />
             {query.length > 0 && Platform.OS !== "ios" && (
               <Pressable onPress={() => setQuery("")} hitSlop={8}>
-                <Ionicons name="close-circle" size={18} color={Colors.textTertiary} />
+                <MaterialCommunityIcons name="close-circle" size={18} color={Colors.textTertiary} />
               </Pressable>
             )}
           </View>
@@ -168,7 +168,7 @@ export function AnimalPickerModal({ visible, onSelect, onCustom, onClose, langua
                 showCustomRow ? (
                   <Pressable onPress={handleCustom} style={styles.customRow}>
                     <View style={styles.customRowIcon}>
-                      <Ionicons name="add" size={20} color={Colors.primary} />
+                      <MaterialCommunityIcons name="plus" size={20} color={Colors.primary} />
                     </View>
                     <View style={styles.customRowText}>
                       <Text style={styles.customRowLabel}>

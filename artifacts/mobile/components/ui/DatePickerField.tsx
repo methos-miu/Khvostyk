@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import * as Haptics from "expo-haptics";
 import React, { useRef, useState } from "react";
@@ -107,7 +107,7 @@ export function DatePickerField({ value, onChange, placeholder, label, minimumDa
         <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
           {displayValue || (placeholder ?? (language === "uk" ? "Оберіть дату" : "Select date"))}
         </Text>
-        <Ionicons name="calendar" size={18} color={Colors.primary} />
+        <MaterialCommunityIcons name="calendar" size={18} color={Colors.primary} />
       </Pressable>
     );
   }
@@ -125,7 +125,7 @@ export function DatePickerField({ value, onChange, placeholder, label, minimumDa
           <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
             {displayValue || (placeholder ?? (language === "uk" ? "Оберіть дату" : "Select date"))}
           </Text>
-          <Ionicons name="calendar" size={18} color={Colors.primary} />
+          <MaterialCommunityIcons name="calendar" size={18} color={Colors.primary} />
         </Pressable>
         {showPicker && (
           <DateTimePicker
@@ -154,7 +154,7 @@ export function DatePickerField({ value, onChange, placeholder, label, minimumDa
         <Text style={[styles.fieldText, !displayValue && styles.fieldPlaceholder]}>
           {displayValue || (placeholder ?? (language === "uk" ? "Оберіть дату" : "Select date"))}
         </Text>
-        <Ionicons name="calendar" size={18} color={Colors.primary} />
+        <MaterialCommunityIcons name="calendar" size={18} color={Colors.primary} />
       </Pressable>
 
       <Modal

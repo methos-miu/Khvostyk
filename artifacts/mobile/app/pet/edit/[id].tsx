@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
@@ -254,12 +254,12 @@ export default function EditPetScreen() {
               <Image source={{ uri: form.photoUri }} style={styles.photoPreview} contentFit="cover" />
             ) : (
               <View style={styles.photoPlaceholder}>
-                <Ionicons name="camera-outline" size={36} color={Colors.primary} />
+                <MaterialCommunityIcons name="camera-outline" size={36} color={Colors.primary} />
                 <Text style={styles.photoPlaceholderText}>{t.addPet}</Text>
               </View>
             )}
             <View style={styles.photoBadge}>
-              <Ionicons name="camera" size={14} color={Colors.textLight} />
+              <MaterialCommunityIcons name="camera" size={14} color={Colors.textLight} />
             </View>
           </Pressable>
 
@@ -331,14 +331,14 @@ export default function EditPetScreen() {
                 onPress={() => { Haptics.selectionAsync(); updateForm("gender", form.gender === "male" ? null : "male"); }}
                 style={[styles.genderOption, form.gender === "male" && styles.genderMaleActive]}
               >
-                <Ionicons name="male" size={20} color={form.gender === "male" ? Colors.textLight : Colors.primary} />
+                <MaterialCommunityIcons name="gender-male" size={20} color={form.gender === "male" ? Colors.textLight : Colors.primary} />
                 <Text style={[styles.genderLabel, form.gender === "male" && styles.genderLabelActive]}>{t.male}</Text>
               </Pressable>
               <Pressable
                 onPress={() => { Haptics.selectionAsync(); updateForm("gender", form.gender === "female" ? null : "female"); }}
                 style={[styles.genderOption, form.gender === "female" && styles.genderFemaleActive]}
               >
-                <Ionicons name="female" size={20} color={form.gender === "female" ? Colors.textLight : "#E91E63"} />
+                <MaterialCommunityIcons name="gender-female" size={20} color={form.gender === "female" ? Colors.textLight : "#E91E63"} />
                 <Text style={[styles.genderLabel, form.gender === "female" && styles.genderLabelActive]}>{t.female}</Text>
               </Pressable>
             </View>
@@ -371,7 +371,7 @@ export default function EditPetScreen() {
                       <Text style={[styles.input, !form.breed && { color: Colors.textTertiary }]} numberOfLines={1}>
                         {form.breed || t.breedPlaceholder}
                       </Text>
-                      <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
+                      <MaterialCommunityIcons name="chevron-down" size={16} color={Colors.textTertiary} />
                     </View>
                   </Pressable>
                   <View style={styles.divider} />
@@ -410,7 +410,7 @@ export default function EditPetScreen() {
                   <Text style={[styles.input, !form.weight && { color: Colors.textTertiary }]}>
                     {form.weight ? `${form.weight} кг` : "— кг"}
                   </Text>
-                  <Ionicons name="chevron-down" size={16} color={Colors.textTertiary} />
+                  <MaterialCommunityIcons name="chevron-down" size={16} color={Colors.textTertiary} />
                 </View>
               </Pressable>
               <View style={styles.divider} />

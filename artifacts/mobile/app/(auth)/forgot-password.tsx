@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -53,7 +53,7 @@ export default function ForgotPasswordScreen() {
         style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#FFFAF6" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#FFFAF6" />
         </Pressable>
         <Text style={styles.headerTitle}>Відновлення паролю</Text>
         <View style={{ width: 40 }} />
@@ -88,7 +88,7 @@ export default function ForgotPasswordScreen() {
               <View style={styles.inputGroup}>
                 <Text style={styles.label}>Email</Text>
                 <View style={styles.inputWrap}>
-                  <Ionicons name="mail-outline" size={18} color="#C4956A" />
+                  <MaterialCommunityIcons name="email-outline" size={18} color="#C4956A" />
                   <TextInput
                     style={styles.input}
                     value={email}

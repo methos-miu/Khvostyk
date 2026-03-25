@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import React from "react";
 import { StyleSheet, View } from "react-native";
@@ -37,7 +37,7 @@ export function PetAvatar({ photoUri, species, size = 56, color }: PetAvatarProp
         { width: size, height: size, borderRadius: size / 2, backgroundColor: bgColor },
       ]}
     >
-      <Ionicons name={iconName} size={iconSize} color={Colors.primary} />
+      <MaterialCommunityIcons name={iconName} size={iconSize} color={Colors.primary} />
     </View>
   );
 }

@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -213,7 +213,7 @@ export default function AddVaccinationScreen() {
         </View>
 
         <View style={styles.notificationNote}>
-          <Ionicons name="notifications-outline" size={16} color={Colors.primary} />
+          <MaterialCommunityIcons name="bell-outline" size={16} color={Colors.primary} />
           <Text style={styles.notificationNoteText}>
             Ви отримаєте нагадування за 7 днів до наступної вакцинації
           </Text>

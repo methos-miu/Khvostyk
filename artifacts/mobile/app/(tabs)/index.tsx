@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -70,7 +70,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
                 pet.gender === "male" ? styles.genderMale : styles.genderFemale,
               ]}
             >
-              <Ionicons
+              <MaterialCommunityIcons
                 name={pet.gender === "male" ? "male" : "female"}
                 size={10}
                 color="#fff"
@@ -86,7 +86,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
           </Text>
           <View style={styles.cardMeta}>
             <View style={styles.agePill}>
-              <Ionicons name="time-outline" size={11} color={Colors.primary} />
+              <MaterialCommunityIcons name="clock-outline" size={11} color={Colors.primary} />
               <Text style={styles.agePillText}>{age}</Text>
             </View>
             {pet.weight ? (
@@ -97,7 +97,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
           </View>
           {pet.vaccinations.length > 0 && (
             <View style={styles.vaccinationChip}>
-              <Ionicons name="shield-checkmark" size={12} color={Colors.accentGreen} />
+              <MaterialCommunityIcons name="shield-check" size={12} color={Colors.accentGreen} />
               <Text style={styles.vaccinationChipText}>
                 {pet.vaccinations.length} {language === "uk" ? "вакц." : "vacc."}
               </Text>
@@ -105,7 +105,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
           )}
         </View>
 
-        <Ionicons name="chevron-forward" size={18} color={Colors.border} style={styles.chevron} />
+        <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.border} style={styles.chevron} />
       </AnimatedPressable>
     </Animated.View>
   );
@@ -142,7 +142,7 @@ export default function HomeScreen() {
               }}
               style={styles.addButton}
             >
-              <Ionicons name="add" size={28} color={Colors.textLight} />
+              <MaterialCommunityIcons name="plus" size={28} color={Colors.textLight} />
             </Pressable>
           </Animated.View>
         </Animated.View>
@@ -175,7 +175,7 @@ export default function HomeScreen() {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
             >
-              <Ionicons name="add-circle-outline" size={20} color={Colors.textLight} />
+              <MaterialCommunityIcons name="plus-circle-outline" size={20} color={Colors.textLight} />
               <Text style={styles.emptyButtonText}>{t.addPet}</Text>
             </LinearGradient>
           </Pressable>

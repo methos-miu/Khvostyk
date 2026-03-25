@@ -3,7 +3,7 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,7 +23,7 @@ function NativeTabLayout() {
         <Icon sf={{ default: "bell", selected: "bell.fill" }} />
         <Label>{t.reminders}</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="settings">
+      <NativeTabs.Trigger name="cog">
         <Icon sf={{ default: "gear", selected: "gear" }} />
         <Label>{t.settings}</Label>
       </NativeTabs.Trigger>
@@ -74,7 +74,7 @@ function ClassicTabLayout() {
             isIOS ? (
               <SymbolView name="pawprint.fill" tintColor={color} size={24} />
             ) : (
-              <Ionicons name="paw" size={22} color={color} />
+              <MaterialCommunityIcons name="paw" size={22} color={color} />
             ),
         }}
       />
@@ -86,19 +86,19 @@ function ClassicTabLayout() {
             isIOS ? (
               <SymbolView name="bell.fill" tintColor={color} size={24} />
             ) : (
-              <Ionicons name="notifications" size={22} color={color} />
+              <MaterialCommunityIcons name="bell" size={22} color={color} />
             ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="cog"
         options={{
           title: t.settings,
           tabBarIcon: ({ color }) =>
             isIOS ? (
               <SymbolView name="gear" tintColor={color} size={24} />
             ) : (
-              <Ionicons name="settings-outline" size={22} color={color} />
+              <MaterialCommunityIcons name="cog-outline" size={22} color={color} />
             ),
         }}
       />

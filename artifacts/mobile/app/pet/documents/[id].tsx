@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -203,11 +203,11 @@ function DocumentViewer({
       {/* Header */}
       <View style={[viewerStyles.header, { paddingTop: insets.top + 6 }]}>
         <Pressable onPress={onClose} hitSlop={10} style={viewerStyles.headerBtn}>
-          <Ionicons name="close" size={26} color="#fff" />
+          <MaterialCommunityIcons name="close" size={26} color="#fff" />
         </Pressable>
         <Text style={viewerStyles.headerTitle} numberOfLines={1}>{doc.name}</Text>
         <Pressable onPress={confirmDelete} hitSlop={10} style={viewerStyles.headerBtn}>
-          <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
+          <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FF6B6B" />
         </Pressable>
       </View>
 
@@ -223,7 +223,7 @@ function DocumentViewer({
           ) : (
             <Animated.View style={[viewerStyles.pdfWrap, animatedStyle]}>
               <View style={viewerStyles.pdfIconBg}>
-                <Ionicons name="document" size={64} color="#FF6B6B" />
+                <MaterialCommunityIcons name="file-document" size={64} color="#FF6B6B" />
               </View>
               <Text style={viewerStyles.pdfName}>{doc.name}</Text>
               {isPDF(doc.type) && (
@@ -239,7 +239,7 @@ function DocumentViewer({
       {/* Bottom bar */}
       <View style={[viewerStyles.bottomBar, { paddingBottom: insets.bottom + 16 }]}>
         <Pressable onPress={handleShare} style={viewerStyles.shareBtn}>
-          <Ionicons name="share-outline" size={20} color="#fff" />
+          <MaterialCommunityIcons name="share-variant-outline" size={20} color="#fff" />
           <Text style={viewerStyles.shareBtnText}>{language === "uk" ? "Поділитися" : "Share"}</Text>
         </Pressable>
       </View>
@@ -406,7 +406,7 @@ export default function DocumentsScreen() {
       title: `${t.documents} • ${pet?.name ?? ""}`,
       headerRight: () => (
         <Pressable onPress={showAddOptions} style={{ marginRight: 4 }}>
-          <Ionicons name="add" size={26} color={Colors.primary} />
+          <MaterialCommunityIcons name="plus" size={26} color={Colors.primary} />
         </Pressable>
       ),
     });
@@ -442,7 +442,7 @@ export default function DocumentsScreen() {
             <Image source={{ uri: item.uri }} style={styles.docThumbnail} resizeMode="cover" />
           ) : (
             <View style={[styles.docIconContainer, { backgroundColor: isPdf ? "#FFF0F0" : catInfo.bg }]}>
-              <Ionicons
+              <MaterialCommunityIcons
                 name={isPdf ? "document" : (catInfo.icon as any)}
                 size={28}
                 color={isPdf ? "#FF6B6B" : catInfo.color}
@@ -470,9 +470,9 @@ export default function DocumentsScreen() {
               hitSlop={8}
               style={styles.cardActionBtn}
             >
-              <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
+              <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.textTertiary} />
             </Pressable>
-            <Ionicons name="chevron-forward" size={16} color={Colors.textTertiary} style={{ marginTop: 8 }} />
+            <MaterialCommunityIcons name="chevron-right" size={16} color={Colors.textTertiary} style={{ marginTop: 8 }} />
           </View>
         </Pressable>
       </Animated.View>
@@ -485,7 +485,7 @@ export default function DocumentsScreen() {
         {allDocs.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={styles.emptyIcon}>
-              <Ionicons name="folder-open-outline" size={44} color={Colors.primary} />
+              <MaterialCommunityIcons name="folder-open-outline" size={44} color={Colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>{t.noDocuments}</Text>
             <Text style={styles.emptySubtitle}>
@@ -494,7 +494,7 @@ export default function DocumentsScreen() {
                 : `Save vet documents, passports and test results for ${pet.name}`}
             </Text>
             <Pressable onPress={showAddOptions} style={styles.emptyButton}>
-              <Ionicons name="cloud-upload-outline" size={18} color={Colors.textLight} />
+              <MaterialCommunityIcons name="cloud-upload-outline" size={18} color={Colors.textLight} />
               <Text style={styles.emptyButtonText}>{t.addDocument}</Text>
             </Pressable>
           </View>
@@ -508,7 +508,7 @@ export default function DocumentsScreen() {
             ListHeaderComponent={
               <View>
                 <View style={styles.storageInfo}>
-                  <Ionicons name="folder" size={16} color={Colors.primary} />
+                  <MaterialCommunityIcons name="folder" size={16} color={Colors.primary} />
                   <Text style={styles.storageText}>{t.docCount(allDocs.length)}</Text>
                 </View>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
@@ -523,7 +523,7 @@ export default function DocumentsScreen() {
                       onPress={() => setFilterCat(cat.key)}
                       style={[styles.filterChip, filterCat === cat.key && { backgroundColor: cat.bg, borderColor: cat.color }]}
                     >
-                      <Ionicons name={cat.icon as any} size={13} color={filterCat === cat.key ? cat.color : Colors.textSecondary} />
+                      <MaterialCommunityIcons name={cat.icon as any} size={13} color={filterCat === cat.key ? cat.color : Colors.textSecondary} />
                       <Text style={[styles.filterChipText, filterCat === cat.key && { color: cat.color, fontFamily: "Inter_600SemiBold" }]}>
                         {language === "uk" ? cat.labelUk : cat.labelEn}
                       </Text>
@@ -589,7 +589,7 @@ export default function DocumentsScreen() {
             {/* Header */}
             <View style={styles.addModalHeader}>
               <Pressable onPress={closeAddModal} style={styles.addModalClose}>
-                <Ionicons name="close" size={22} color={Colors.textSecondary} />
+                <MaterialCommunityIcons name="close" size={22} color={Colors.textSecondary} />
               </Pressable>
               <Text style={styles.addModalTitle}>
                 {language === "uk" ? "Новий документ" : "New Document"}
@@ -605,7 +605,7 @@ export default function DocumentsScreen() {
                     <Image source={{ uri: pendingFile.uri }} style={styles.previewImage} resizeMode="cover" />
                   ) : (
                     <View style={styles.previewIconWrap}>
-                      <Ionicons name={isPDF(pendingFile.type) ? "document" : "document-attach"} size={48} color={isPDF(pendingFile.type) ? "#FF6B6B" : Colors.primary} />
+                      <MaterialCommunityIcons name={isPDF(pendingFile.type) ? "document" : "document-attach"} size={48} color={isPDF(pendingFile.type) ? "#FF6B6B" : Colors.primary} />
                       <Text style={styles.previewIconLabel}>{isPDF(pendingFile.type) ? "PDF" : (language === "uk" ? "Файл" : "File")}</Text>
                     </View>
                   )}
@@ -643,7 +643,7 @@ export default function DocumentsScreen() {
                         onPress={() => { setDocCategory(cat.key); Haptics.selectionAsync(); }}
                         style={[styles.catChip, active && { backgroundColor: cat.bg, borderColor: cat.color }]}
                       >
-                        <Ionicons name={cat.icon as any} size={15} color={active ? cat.color : Colors.textSecondary} />
+                        <MaterialCommunityIcons name={cat.icon as any} size={15} color={active ? cat.color : Colors.textSecondary} />
                         <Text style={[styles.catChipText, active && { color: cat.color, fontFamily: "Inter_600SemiBold" }]}>
                           {language === "uk" ? cat.labelUk : cat.labelEn}
                         </Text>
@@ -672,7 +672,7 @@ export default function DocumentsScreen() {
                 onPress={handleSaveDocument}
                 style={({ pressed }) => [styles.saveBtn, pressed && { opacity: 0.85 }]}
               >
-                <Ionicons name="checkmark-circle" size={20} color="#fff" />
+                <MaterialCommunityIcons name="check-circle" size={20} color="#fff" />
                 <Text style={styles.saveBtnText}>{language === "uk" ? "Зберегти" : "Save"}</Text>
               </Pressable>
             </ScrollView>

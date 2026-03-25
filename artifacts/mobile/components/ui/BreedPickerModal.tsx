@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import React, { useState, useMemo, useRef } from "react";
 import {
@@ -176,7 +176,7 @@ export function BreedPickerModal({
             <View style={styles.header}>
               <Text style={styles.headerTitle}>{title}</Text>
               <Pressable onPress={handleClose} hitSlop={10}>
-                <Ionicons
+                <MaterialCommunityIcons
                   name="close-circle"
                   size={28}
                   color={Colors.textSecondary}
@@ -187,7 +187,7 @@ export function BreedPickerModal({
             {/* Search bar — shown in normal mode */}
             {!showCustomInput && (
               <View style={styles.searchBar}>
-                <Ionicons name="search" size={17} color={Colors.textTertiary} />
+                <MaterialCommunityIcons name="magnify" size={17} color={Colors.textTertiary} />
                 <TextInput
                   style={styles.searchInput}
                   value={query}
@@ -204,7 +204,7 @@ export function BreedPickerModal({
                     onPress={() => handleSearchChange("")}
                     hitSlop={10}
                   >
-                    <Ionicons
+                    <MaterialCommunityIcons
                       name="close-circle"
                       size={17}
                       color={Colors.textTertiary}
@@ -239,8 +239,8 @@ export function BreedPickerModal({
                     onPress={handleCustomSave}
                     style={styles.customSaveBtn}
                   >
-                    <Ionicons
-                      name="checkmark"
+                    <MaterialCommunityIcons
+                      name="check"
                       size={20}
                       color={Colors.textLight}
                     />
@@ -250,8 +250,8 @@ export function BreedPickerModal({
                   onPress={() => setShowCustomInput(false)}
                   style={styles.backBtn}
                 >
-                  <Ionicons
-                    name="chevron-back"
+                  <MaterialCommunityIcons
+                    name="chevron-left"
                     size={16}
                     color={Colors.primary}
                   />
@@ -284,8 +284,8 @@ export function BreedPickerModal({
                   >
                     {highlightText(item, query)}
                     {selectedBreed === item && (
-                      <Ionicons
-                        name="checkmark"
+                      <MaterialCommunityIcons
+                        name="check"
                         size={18}
                         color={Colors.primary}
                       />
@@ -297,8 +297,8 @@ export function BreedPickerModal({
                 )}
                 ListEmptyComponent={
                   <View style={styles.emptyResult}>
-                    <Ionicons
-                      name="search-outline"
+                    <MaterialCommunityIcons
+                      name="magnify"
                       size={32}
                       color={Colors.textTertiary}
                     />

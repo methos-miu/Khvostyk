@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect } from "react";
@@ -39,7 +39,7 @@ export default function VaccinationsScreen() {
           }}
           style={{ marginRight: 4 }}
         >
-          <Ionicons name="add" size={26} color={Colors.primary} />
+          <MaterialCommunityIcons name="plus" size={26} color={Colors.primary} />
         </Pressable>
       ),
     });
@@ -92,13 +92,13 @@ export default function VaccinationsScreen() {
                 }}
                 hitSlop={8}
               >
-                <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
+                <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.textTertiary} />
               </Pressable>
             </View>
 
             <View style={styles.datesRow}>
               <View style={styles.dateItem}>
-                <Ionicons name="checkmark-circle" size={14} color={Colors.accentGreen} />
+                <MaterialCommunityIcons name="check-circle" size={14} color={Colors.accentGreen} />
                 <View>
                   <Text style={styles.dateLabel}>{t.done}</Text>
                   <Text style={styles.dateValue}>{formatDate(item.date)}</Text>
@@ -106,7 +106,7 @@ export default function VaccinationsScreen() {
               </View>
               <View style={styles.dateSep} />
               <View style={styles.dateItem}>
-                <Ionicons name="arrow-forward-circle" size={14} color={Colors.primary} />
+                <MaterialCommunityIcons name="arrow-right-circle" size={14} color={Colors.primary} />
                 <View>
                   <Text style={styles.dateLabel}>{t.next}</Text>
                   <Text style={styles.dateValue}>{formatDate(item.nextDate)}</Text>
@@ -116,7 +116,7 @@ export default function VaccinationsScreen() {
 
             {item.vetName ? (
               <View style={styles.vetRow}>
-                <Ionicons name="person-outline" size={14} color={Colors.textTertiary} />
+                <MaterialCommunityIcons name="account-outline" size={14} color={Colors.textTertiary} />
                 <Text style={styles.vetText}>{item.vetName}</Text>
               </View>
             ) : null}
@@ -135,7 +135,7 @@ export default function VaccinationsScreen() {
       {sorted.length === 0 ? (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIcon}>
-            <Ionicons name="medical-outline" size={40} color={Colors.primary} />
+            <MaterialCommunityIcons name="medical-bag" size={40} color={Colors.primary} />
           </View>
           <Text style={styles.emptyTitle}>{t.noVaccinations}</Text>
           <Text style={styles.emptySubtitle}>

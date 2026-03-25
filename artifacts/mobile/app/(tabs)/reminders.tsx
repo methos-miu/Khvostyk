@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -203,7 +203,7 @@ export default function RemindersScreen() {
         <Pressable onPress={handlePress} style={styles.card}>
           <View style={[styles.statusBar, { backgroundColor: cfg.color }]} />
           <View style={[styles.statusIcon, { backgroundColor: cfg.bg }]}>
-            <Ionicons name={typeIcon as any} size={20} color={cfg.color} />
+            <MaterialCommunityIcons name={typeIcon as any} size={20} color={cfg.color} />
           </View>
           <View style={styles.cardContent}>
             <Text style={styles.vaccineName} numberOfLines={1}>{title}</Text>
@@ -258,7 +258,7 @@ export default function RemindersScreen() {
             </View>
             {pets.length > 0 && (
               <Pressable onPress={openAddModal} style={styles.addHeaderBtn}>
-                <Ionicons name="add" size={22} color={Colors.textLight} />
+                <MaterialCommunityIcons name="plus" size={22} color={Colors.textLight} />
               </Pressable>
             )}
           </Animated.View>
@@ -283,7 +283,7 @@ export default function RemindersScreen() {
           <Animated.View entering={FadeInDown.delay(200)} style={styles.emptyContainer}>
             <View style={styles.emptyIconWrap}>
               <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.emptyIconGradient}>
-                <Ionicons name="notifications" size={44} color={Colors.textLight} />
+                <MaterialCommunityIcons name="bell" size={44} color={Colors.textLight} />
               </LinearGradient>
             </View>
             <Text style={styles.emptyTitle}>
@@ -298,7 +298,7 @@ export default function RemindersScreen() {
             </Text>
             {pets.length > 0 && (
               <Pressable onPress={openAddModal} style={styles.addEmptyBtn}>
-                <Ionicons name="add-circle" size={20} color={Colors.textLight} />
+                <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
                 <Text style={styles.addEmptyBtnText}>
                   {language === "uk" ? "Додати нагадування" : "Add Reminder"}
                 </Text>
@@ -315,7 +315,7 @@ export default function RemindersScreen() {
             ListHeaderComponent={
               urgentCount > 0 ? (
                 <View style={styles.alertBanner}>
-                  <Ionicons name="notifications" size={16} color={Colors.primary} />
+                  <MaterialCommunityIcons name="bell" size={16} color={Colors.primary} />
                   <Text style={styles.alertText}>
                     {language === "uk" ? `${urgentCount} нагадувань потребують уваги` : `${urgentCount} reminders need attention`}
                   </Text>
@@ -365,7 +365,7 @@ export default function RemindersScreen() {
                   {REMINDER_TYPES.map(rt => (
                     <Pressable key={rt.type} onPress={() => { Haptics.selectionAsync(); setReminderType(rt.type); }}
                       style={[styles.typeChip, { backgroundColor: rt.bg, borderColor: reminderType === rt.type ? rt.color : Colors.border }]}>
-                      <Ionicons name={rt.icon as any} size={18} color={rt.color} />
+                      <MaterialCommunityIcons name={rt.icon as any} size={18} color={rt.color} />
                       <Text style={[styles.typeChipText, { color: rt.color }]}>
                         {language === "uk" ? rt.iconUk : rt.iconEn}
                       </Text>

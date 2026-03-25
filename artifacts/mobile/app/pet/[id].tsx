@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
@@ -112,7 +112,7 @@ export default function PetProfileScreen() {
   if (!pet) {
     return (
       <View style={styles.notFound}>
-        <Ionicons name="paw-outline" size={48} color={Colors.textTertiary} />
+        <MaterialCommunityIcons name="paw-outline" size={48} color={Colors.textTertiary} />
         <Text style={styles.notFoundText}>{t.notFound}</Text>
       </View>
     );
@@ -188,7 +188,7 @@ export default function PetProfileScreen() {
             <View style={styles.infoCard}>
               <Text style={styles.cardSectionTitle}>{t.details}</Text>
               <View style={styles.infoRow}>
-                <Ionicons name="calendar-outline" size={18} color={Colors.primary} />
+                <MaterialCommunityIcons name="calendar-outline" size={18} color={Colors.primary} />
                 <Text style={styles.infoLabel}>{t.birthdate}</Text>
                 <Text style={styles.infoValue}>{formatDate(pet.birthdate)}</Text>
               </View>
@@ -196,7 +196,7 @@ export default function PetProfileScreen() {
                 <>
                   <View style={styles.divider} />
                   <View style={styles.infoRow}>
-                    <Ionicons name="color-palette-outline" size={18} color={Colors.primary} />
+                    <MaterialCommunityIcons name="palette-outline" size={18} color={Colors.primary} />
                     <Text style={styles.infoLabel}>{t.color}</Text>
                     <Text style={styles.infoValue}>{pet.color}</Text>
                   </View>
@@ -206,7 +206,7 @@ export default function PetProfileScreen() {
                 <>
                   <View style={styles.divider} />
                   <View style={styles.infoRow}>
-                    <Ionicons name={pet.gender === "male" ? "male" : "female"} size={18} color={pet.gender === "male" ? Colors.primary : "#E91E63"} />
+                    <MaterialCommunityIcons name={pet.gender === "male" ? "male" : "female"} size={18} color={pet.gender === "male" ? Colors.primary : "#E91E63"} />
                     <Text style={styles.infoLabel}>{t.gender}</Text>
                     <Text style={styles.infoValue}>{pet.gender === "male" ? t.male : t.female}</Text>
                   </View>
@@ -228,7 +228,7 @@ export default function PetProfileScreen() {
               <View style={styles.infoCard}>
                 {med?.allergies ? (
                   <View style={styles.infoRow}>
-                    <Ionicons name="alert-circle-outline" size={18} color="#FF6B6B" />
+                    <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FF6B6B" />
                     <Text style={styles.infoLabel}>{language === "uk" ? "Алергії" : "Allergies"}</Text>
                     <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]} numberOfLines={2}>{med.allergies}</Text>
                   </View>
@@ -237,7 +237,7 @@ export default function PetProfileScreen() {
                   <>
                     {med?.allergies && <View style={styles.divider} />}
                     <View style={styles.infoRow}>
-                      <Ionicons name="fitness-outline" size={18} color="#FF9500" />
+                      <MaterialCommunityIcons name="heart-pulse" size={18} color="#FF9500" />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Хроніч. хвороби" : "Chronic Conditions"}</Text>
                       <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]} numberOfLines={2}>{med.chronicConditions}</Text>
                     </View>
@@ -247,7 +247,7 @@ export default function PetProfileScreen() {
                   <>
                     {(med?.allergies || med?.chronicConditions) && <View style={styles.divider} />}
                     <View style={styles.infoRow}>
-                      <Ionicons name="person-outline" size={18} color={Colors.primary} />
+                      <MaterialCommunityIcons name="account-outline" size={18} color={Colors.primary} />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Ветеринар" : "Vet"}</Text>
                       <Text style={styles.infoValue}>{med.vetName}</Text>
                     </View>
@@ -257,7 +257,7 @@ export default function PetProfileScreen() {
                   <>
                     {(med?.allergies || med?.chronicConditions || med?.vetName) && <View style={styles.divider} />}
                     <View style={styles.infoRow}>
-                      <Ionicons name="call-outline" size={18} color={Colors.accentGreen} />
+                      <MaterialCommunityIcons name="phone-outline" size={18} color={Colors.accentGreen} />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Телефон ветеринара" : "Vet Phone"}</Text>
                       <Text style={styles.infoValue}>{med.vetPhone}</Text>
                     </View>
@@ -266,7 +266,7 @@ export default function PetProfileScreen() {
               </View>
             ) : (
               <Pressable onPress={openMedicalModal} style={styles.emptyCard}>
-                <Ionicons name="medkit-outline" size={26} color={Colors.primary} />
+                <MaterialCommunityIcons name="briefcase-plus-outline" size={26} color={Colors.primary} />
                 <Text style={styles.emptyCardText}>
                   {language === "uk" ? "Додати медичну інформацію" : "Add medical information"}
                 </Text>
@@ -288,7 +288,7 @@ export default function PetProfileScreen() {
                 onPress={() => router.push({ pathname: "/pet/add-vaccination/[id]", params: { id: pet.id } })}
                 style={styles.emptyCard}
               >
-                <Ionicons name="add-circle-outline" size={26} color={Colors.primary} />
+                <MaterialCommunityIcons name="plus-circle-outline" size={26} color={Colors.primary} />
                 <Text style={styles.emptyCardText}>{t.addVaccination}</Text>
               </Pressable>
             ) : (
@@ -316,7 +316,7 @@ export default function PetProfileScreen() {
                 onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/vaccinations/[id]", params: { id: pet.id } }); }}
                 style={[styles.actionButton, { backgroundColor: Colors.primaryLight }]}
               >
-                <Ionicons name="medical" size={24} color={Colors.primary} />
+                <MaterialCommunityIcons name="medical-bag" size={24} color={Colors.primary} />
                 <Text style={[styles.actionLabel, { color: Colors.primary }]}>{t.vaccinations}</Text>
               </Pressable>
 
@@ -324,7 +324,7 @@ export default function PetProfileScreen() {
                 onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/documents/[id]", params: { id: pet.id } }); }}
                 style={[styles.actionButton, { backgroundColor: "#FFF0F0" }]}
               >
-                <Ionicons name="document-text" size={24} color={Colors.accent} />
+                <MaterialCommunityIcons name="file-document-outline" size={24} color={Colors.accent} />
                 <Text style={[styles.actionLabel, { color: Colors.accent }]}>{t.documents}</Text>
               </Pressable>
 
@@ -332,7 +332,7 @@ export default function PetProfileScreen() {
                 onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/weight/[id]", params: { id: pet.id } }); }}
                 style={[styles.actionButton, { backgroundColor: "#F0FFF5" }]}
               >
-                <Ionicons name="analytics" size={24} color={Colors.accentGreen} />
+                <MaterialCommunityIcons name="chart-line" size={24} color={Colors.accentGreen} />
                 <Text style={[styles.actionLabel, { color: Colors.accentGreen }]}>{language === "uk" ? "Вага" : "Weight"}</Text>
               </Pressable>
             </View>

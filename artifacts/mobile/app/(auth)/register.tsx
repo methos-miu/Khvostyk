@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
@@ -74,7 +74,7 @@ export default function RegisterScreen() {
         style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={22} color="#FFFAF6" />
+          <MaterialCommunityIcons name="arrow-left" size={22} color="#FFFAF6" />
         </Pressable>
         <Text style={styles.headerTitle}>Реєстрація</Text>
         <View style={{ width: 40 }} />
@@ -94,7 +94,7 @@ export default function RegisterScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Ваше ім'я</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="person-outline" size={18} color="#C4956A" />
+                <MaterialCommunityIcons name="account-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={styles.input}
                   value={name}
@@ -112,7 +112,7 @@ export default function RegisterScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Email</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="mail-outline" size={18} color="#C4956A" />
+                <MaterialCommunityIcons name="email-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={styles.input}
                   value={email}
@@ -132,7 +132,7 @@ export default function RegisterScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Пароль</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="lock-closed-outline" size={18} color="#C4956A" />
+                <MaterialCommunityIcons name="lock-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
                   value={password}
@@ -142,7 +142,7 @@ export default function RegisterScreen() {
                   secureTextEntry={!showPw}
                 />
                 <Pressable onPress={() => setShowPw(!showPw)} hitSlop={8} style={{ padding: 4 }}>
-                  <Ionicons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#C4956A" />
+                  <MaterialCommunityIcons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#C4956A" />
                 </Pressable>
               </View>
             </View>
@@ -152,7 +152,7 @@ export default function RegisterScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Підтвердіть пароль</Text>
               <View style={styles.inputWrap}>
-                <Ionicons name="shield-checkmark-outline" size={18} color="#C4956A" />
+                <MaterialCommunityIcons name="shield-check-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={styles.input}
                   value={confirm}

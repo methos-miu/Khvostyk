@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import React, { useLayoutEffect, useState, useMemo, useRef } from "react";
@@ -136,7 +136,7 @@ export default function WeightScreen() {
       title: language === "uk" ? `Вага • ${pet?.name}` : `Weight • ${pet?.name}`,
       headerRight: () => (
         <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPicker(true); }} style={{ marginRight: 4 }}>
-          <Ionicons name="add" size={26} color={Colors.primary} />
+          <MaterialCommunityIcons name="plus" size={26} color={Colors.primary} />
         </Pressable>
       ),
     });
@@ -209,7 +209,7 @@ export default function WeightScreen() {
         {sorted.length === 0 ? (
           <Animated.View entering={FadeInDown.delay(100)} style={styles.emptyWrap}>
             <View style={styles.emptyIconCircle}>
-              <Ionicons name="analytics-outline" size={40} color={Colors.primary} />
+              <MaterialCommunityIcons name="chart-line" size={40} color={Colors.primary} />
             </View>
             <Text style={styles.emptyTitle}>{language === "uk" ? "Немає записів" : "No entries yet"}</Text>
             <Text style={styles.emptySubtitle}>
@@ -218,7 +218,7 @@ export default function WeightScreen() {
                 : `Tap + to add the first weight entry for ${pet.name}`}
             </Text>
             <Pressable onPress={() => setShowPicker(true)} style={styles.addBtn}>
-              <Ionicons name="add" size={20} color={Colors.textLight} />
+              <MaterialCommunityIcons name="plus" size={20} color={Colors.textLight} />
               <Text style={styles.addBtnText}>{language === "uk" ? "Додати вагу" : "Add weight"}</Text>
             </Pressable>
           </Animated.View>
@@ -227,7 +227,7 @@ export default function WeightScreen() {
             <Animated.View key={entry.id} entering={FadeInDown.delay(index * 50)}>
               <View style={styles.entryCard}>
                 <View style={styles.entryIconWrap}>
-                  <Ionicons name="scale-outline" size={20} color={Colors.primary} />
+                  <MaterialCommunityIcons name="scale-bathroom" size={20} color={Colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.entryWeight}>{entry.weight.toFixed(1)} кг</Text>
@@ -242,7 +242,7 @@ export default function WeightScreen() {
                   </View>
                 )}
                 <Pressable onPress={() => handleDelete(entry)} hitSlop={8}>
-                  <Ionicons name="trash-outline" size={18} color={Colors.textTertiary} />
+                  <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.textTertiary} />
                 </Pressable>
               </View>
             </Animated.View>

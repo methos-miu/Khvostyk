@@ -1,4 +1,4 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -179,7 +179,7 @@ export default function SettingsScreen() {
               <View style={styles.divider} />
               <Pressable onPress={handleLogout} style={styles.logoutRow}>
                 <View style={[styles.dataIcon, { backgroundColor: "#FFF0F0" }]}>
-                  <Ionicons name="log-out-outline" size={22} color="#E74C3C" />
+                  <MaterialCommunityIcons name="logout" size={22} color="#E74C3C" />
                 </View>
                 <View style={styles.dataInfo}>
                   <Text style={[styles.dataTitle, { color: "#E74C3C" }]}>
@@ -189,7 +189,7 @@ export default function SettingsScreen() {
                     {language === "uk" ? "Ваші дані збережені в хмарі" : "Your data is saved in the cloud"}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={18} color="#E74C3C" style={{ opacity: 0.6 }} />
+                <MaterialCommunityIcons name="chevron-right" size={18} color="#E74C3C" style={{ opacity: 0.6 }} />
               </Pressable>
             </View>
           </Animated.View>
@@ -209,7 +209,7 @@ export default function SettingsScreen() {
                 <Text style={styles.langSubtitle}>Хвостик</Text>
               </View>
               {language === "uk" ? (
-                <View style={styles.checkCircle}><Ionicons name="checkmark" size={14} color={Colors.textLight} /></View>
+                <View style={styles.checkCircle}><MaterialCommunityIcons name="check" size={14} color={Colors.textLight} /></View>
               ) : (
                 <View style={styles.emptyCircle} />
               )}
@@ -225,7 +225,7 @@ export default function SettingsScreen() {
                 <Text style={styles.langSubtitle}>Tailsy</Text>
               </View>
               {language === "en" ? (
-                <View style={styles.checkCircle}><Ionicons name="checkmark" size={14} color={Colors.textLight} /></View>
+                <View style={styles.checkCircle}><MaterialCommunityIcons name="check" size={14} color={Colors.textLight} /></View>
               ) : (
                 <View style={styles.emptyCircle} />
               )}
@@ -243,7 +243,7 @@ export default function SettingsScreen() {
               style={styles.dataRow}
             >
               <View style={[styles.dataIcon, { backgroundColor: Colors.primaryLight }]}>
-                <Ionicons name="cloud-upload-outline" size={22} color={Colors.primary} />
+                <MaterialCommunityIcons name="cloud-upload-outline" size={22} color={Colors.primary} />
               </View>
               <View style={styles.dataInfo}>
                 <Text style={styles.dataTitle}>
@@ -257,7 +257,7 @@ export default function SettingsScreen() {
                     : `${pets.length} pets • JSON file`}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.textTertiary} />
             </Pressable>
 
             <View style={styles.divider} />
@@ -268,7 +268,7 @@ export default function SettingsScreen() {
               style={styles.dataRow}
             >
               <View style={[styles.dataIcon, { backgroundColor: "#F3F0FF" }]}>
-                <Ionicons name="cloud-download-outline" size={22} color="#8B5CF6" />
+                <MaterialCommunityIcons name="cloud-download-outline" size={22} color="#8B5CF6" />
               </View>
               <View style={styles.dataInfo}>
                 <Text style={styles.dataTitle}>
@@ -282,12 +282,12 @@ export default function SettingsScreen() {
                     : "Load JSON backup file"}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color={Colors.textTertiary} />
+              <MaterialCommunityIcons name="chevron-right" size={18} color={Colors.textTertiary} />
             </Pressable>
           </View>
 
           <View style={styles.infoBox}>
-            <Ionicons name="information-circle-outline" size={18} color="#8B5CF6" />
+            <MaterialCommunityIcons name="information-outline" size={18} color="#8B5CF6" />
             <Text style={[styles.infoText, { color: "#8B5CF6" }]}>
               {language === "uk"
                 ? "Резервна копія зберігає всіх тварин, вакцинації, документи та нагадування у форматі JSON"
@@ -302,7 +302,7 @@ export default function SettingsScreen() {
           <View style={styles.card}>
             <View style={styles.aboutRow}>
               <View style={styles.aboutIconBg}>
-                <Ionicons name="heart" size={22} color={Colors.primary} />
+                <MaterialCommunityIcons name="heart" size={22} color={Colors.primary} />
               </View>
               <View style={styles.aboutInfo}>
                 <Text style={styles.aboutName}>{t.appName}</Text>
@@ -322,7 +322,7 @@ export default function SettingsScreen() {
 
         <Animated.View entering={FadeInDown.delay(280)}>
           <View style={styles.infoBox}>
-            <Ionicons name="shield-checkmark-outline" size={20} color={Colors.primary} />
+            <MaterialCommunityIcons name="shield-check-outline" size={20} color={Colors.primary} />
             <Text style={styles.infoText}>
               {language === "uk"
                 ? "Ваші дані захищені та синхронізуються між пристроями через хмару"
