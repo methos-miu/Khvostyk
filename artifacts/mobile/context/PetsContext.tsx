@@ -262,9 +262,11 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
             const { data: signed } = await supabase.storage
               .from("pet-photos")
               .createSignedUrl(storagePath, 3600);
-            return { ...pet, photoUri: signed?.signedUrl ?? undefined };
+            if (signed?.signedUrl) {
+              return { ...pet, photoUri: signed.signedUrl };
+            }
           }
-          return { ...pet, photoUri: undefined };
+          return pet;
         })
       );
 
