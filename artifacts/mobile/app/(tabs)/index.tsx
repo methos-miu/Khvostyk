@@ -70,11 +70,9 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
                 pet.gender === "male" ? styles.genderMale : styles.genderFemale,
               ]}
             >
-              <MaterialCommunityIcons
-                name={pet.gender === "male" ? "male" : "female"}
-                size={10}
-                color="#fff"
-              />
+              <Text style={{ fontSize: 10, color: "#fff" }}>
+                {pet.gender === "male" ? "♂" : "♀"}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -195,12 +193,29 @@ export default function HomeScreen() {
               <Text style={styles.listHeaderText}>{t.pets}</Text>
             </View>
           }
+          ListFooterComponent={() => (
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push("/pet/add");
+              }}
+              style={styles.addButton2}
+            >
+              <LinearGradient
+                colors={["#E8651A", "#C45215"]}
+                style={styles.addButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={styles.addButtonText}>{t.addPet}</Text>
+              </LinearGradient>
+            </Pressable>
+          )}
         />
       )}
     </View>
   );
 }
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: { paddingHorizontal: 20, paddingBottom: 24 },
@@ -288,8 +303,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: Colors.surface,
   },
-  genderMale: { backgroundColor: "#E8651A" },
-  genderFemale: { backgroundColor: "#E91E63" },
+  genderMale: { backgroundColor: "#5B9BD5" },
+  genderFemale: { backgroundColor: "#C4506A" },
   cardInfo: { flex: 1, gap: 4 },
   cardName: { fontSize: 17, fontFamily: "Inter_700Bold", color: Colors.text },
   cardBreed: {
@@ -409,4 +424,17 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     color: Colors.textLight,
   },
-});
+  addButton2: {
+    borderRadius: 18, overflow: "hidden", marginTop: 8,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 3, shadowRadius: 12, elevation: 6,
+  },
+  addButtonGradient: {
+    flexDirection: "row", alignItems: "center",
+    gap: 8, paddingHorizontal: 32, paddingVertical: 16,
+    justifyContent: "center",
+  },
+  addButtonText: {
+    fontSize: 16, fontFamily: "Inter_600SemiBold", color: Colors.textLight,
+  },
+  });

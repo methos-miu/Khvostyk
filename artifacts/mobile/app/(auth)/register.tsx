@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -28,7 +28,10 @@ export default function RegisterScreen() {
   const [confirm, setConfirm] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-
+  const nameRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password) {
       Alert.alert("", "Будь ласка, заповніть всі поля");
@@ -97,12 +100,15 @@ export default function RegisterScreen() {
                 <MaterialCommunityIcons name="account-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={styles.input}
+                  ref={nameRef}
                   value={name}
                   onChangeText={setName}
                   placeholder="Як вас звати?"
                   placeholderTextColor="#C4A882"
                   autoComplete="name"
                   autoCapitalize="words"
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
                 />
               </View>
             </View>
@@ -115,6 +121,7 @@ export default function RegisterScreen() {
                 <MaterialCommunityIcons name="email-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={styles.input}
+                  ref={emailRef}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="your@email.com"
@@ -122,7 +129,11 @@ export default function RegisterScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
+                  spellCheck={false}
                   autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  textContentType="emailAddress"
                 />
               </View>
             </View>
@@ -135,11 +146,16 @@ export default function RegisterScreen() {
                 <MaterialCommunityIcons name="lock-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
+                  ref={passwordRef}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Мінімум 6 символів"
                   placeholderTextColor="#C4A882"
+                  keyboardType="ascii-capable"
+                  textContentType="password"
                   secureTextEntry={!showPw}
+                  returnKeyType="next"
+                  onSubmitEditing={() => confirmRef.current?.focus()}
                 />
                 <Pressable onPress={() => setShowPw(!showPw)} hitSlop={8} style={{ padding: 4 }}>
                   <MaterialCommunityIcons name={showPw ? "eye-off-outline" : "eye-outline"} size={18} color="#C4956A" />
@@ -155,10 +171,13 @@ export default function RegisterScreen() {
                 <MaterialCommunityIcons name="shield-check-outline" size={18} color="#C4956A" />
                 <TextInput
                   style={styles.input}
+                  ref={confirmRef}
                   value={confirm}
                   onChangeText={setConfirm}
                   placeholder="Повторіть пароль"
                   placeholderTextColor="#C4A882"
+                  keyboardType="ascii-capable"
+                  textContentType="password"
                   secureTextEntry={!showPw}
                   returnKeyType="go"
                   onSubmitEditing={handleRegister}

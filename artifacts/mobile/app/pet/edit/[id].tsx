@@ -242,6 +242,28 @@ export default function EditPetScreen() {
       style={{ flex: 1, backgroundColor: Colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <View style={{ paddingTop: 12, paddingBottom: 4, alignItems: "center" }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border }} />
+        </View>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+          <Pressable onPress={() => router.back()} hitSlop={8}>
+            <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
+              {language === "uk" ? "Скасувати" : "Cancel"}
+            </Text>
+          </Pressable>
+          <Text style={{ fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text }}>
+            {language === "uk" ? "Редагувати" : "Edit Pet"}
+          </Text>
+          <Pressable onPress={handleSave} disabled={loading} hitSlop={8}>
+            <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.primary, opacity: loading ? 0.4 : 1 }}>
+              {language === "uk" ? "Зберегти" : "Save"}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       <ScrollView
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
@@ -530,7 +552,9 @@ export default function EditPetScreen() {
 }
 
 const styles = StyleSheet.create({
-  scrollContent: { padding: 20 },
+  scrollContent: { padding: 20, paddingBottom: 120 },
+  topBar: { backgroundColor: Colors.surface },
+
   photoButton: { alignSelf: "center", marginBottom: 28, position: "relative" },
   photoPreview: { width: 110, height: 110, borderRadius: 55 },
   photoPlaceholder: {

@@ -206,7 +206,9 @@ export default function PetProfileScreen() {
                 <>
                   <View style={styles.divider} />
                   <View style={styles.infoRow}>
-                    <MaterialCommunityIcons name={pet.gender === "male" ? "male" : "female"} size={18} color={pet.gender === "male" ? Colors.primary : "#E91E63"} />
+                    <Text style={{ fontSize: 18, color: pet.gender === "male" ? Colors.primary : "#E91E63" }}>
+                      {pet.gender === "male" ? "♂" : "♀"}
+                    </Text>
                     <Text style={styles.infoLabel}>{t.gender}</Text>
                     <Text style={styles.infoValue}>{pet.gender === "male" ? t.male : t.female}</Text>
                   </View>

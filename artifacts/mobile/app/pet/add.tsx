@@ -250,8 +250,8 @@ export default function AddPetScreen() {
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
-        scrollEnabled={keyboardVisible}
+        automaticallyAdjustKeyboardInsets={false}
+        scrollEnabled={true}
         bounces={true}
       >
         <Animated.View entering={FadeIn.delay(80)}>
@@ -565,7 +565,7 @@ const styles = StyleSheet.create({
   topBar: {
     backgroundColor: Colors.surface,
   },
-  scrollContent: { padding: 20 },
+  scrollContent: { padding: 20, paddingBottom: 120 },
   photoButton: { alignSelf: "center", marginBottom: 28, position: "relative" },
   photoPreview: { width: 110, height: 110, borderRadius: 55 },
   photoPlaceholder: {

@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -27,7 +27,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
-
+  const passwordRef = useRef<TextInput>(null);
   const handleLogin = async () => {
     if (!email.trim() || !password) {
       Alert.alert("", "Будь ласка, заповніть всі поля");
@@ -85,6 +85,10 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   autoComplete="email"
                   autoCorrect={false}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  returnKeyType="next"
+                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
               </View>
             </View>
@@ -97,10 +101,13 @@ export default function LoginScreen() {
                 <MaterialCommunityIcons name="lock-outline" size={18} color="#C4956A" style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, { flex: 1 }]}
+                  ref={passwordRef}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Ваш пароль"
                   placeholderTextColor="#C4A882"
+                  keyboardType="ascii-capable"
+                  textContentType="password"
                   secureTextEntry={!showPw}
                   autoComplete="password"
                   returnKeyType="go"

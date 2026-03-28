@@ -148,8 +148,7 @@ function RootLayoutNav() {
         <Stack.Screen
           name="pet/edit/[id]"
           options={{
-            title: language === "uk" ? "Редагувати" : "Edit Pet",
-            headerBackTitle: t.cancel,
+            headerShown: false,
             presentation: "modal",
           }}
         />

@@ -23,7 +23,7 @@ function NativeTabLayout() {
         <Icon sf={{ default: "bell", selected: "bell.fill" }} />
         <Label>{t.reminders}</Label>
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="cog">
+      <NativeTabs.Trigger name="settings">
         <Icon sf={{ default: "gear", selected: "gear" }} />
         <Label>{t.settings}</Label>
       </NativeTabs.Trigger>
@@ -91,7 +91,7 @@ function ClassicTabLayout() {
         }}
       />
       <Tabs.Screen
-        name="cog"
+        name="settings"
         options={{
           title: t.settings,
           tabBarIcon: ({ color }) =>

@@ -5,6 +5,7 @@ import { router } from "expo-router";
 import React, { useState, useRef } from "react";
 import {
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Modal,
@@ -17,7 +18,7 @@ import {
   TextInput,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Reanimated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/constants/colors";
@@ -69,14 +70,44 @@ export default function RemindersScreen() {
   const [notes, setNotes] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"all" | "vaccination" | "other">("all");
 
-  const closeModal = () => setShowAddModal(false);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+
+  const closeModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: 600,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowAddModal(false);
+      slideAnim.setValue(0);
+    });
+  };
+
+  const openAddModal = () => {
+    slideAnim.setValue(0);
+    setSelectedPetId(pets[0]?.id ?? "");
+    setReminderType("deworming");
+    setNextDate("");
+    setNotes("");
+    setShowAddModal(true);
+  };
 
   const handlePanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderMove: (_, gs) => {
+        if (gs.dy > 0) slideAnim.setValue(gs.dy);
+      },
       onPanResponderRelease: (_, gs) => {
-        if (gs.dy > 50) closeModal();
+        if (gs.dy > 80) {
+          closeModal();
+        } else {
+          Animated.spring(slideAnim, {
+            toValue: 0,
+            useNativeDriver: true,
+          }).start();
+        }
       },
     })
   ).current;
@@ -133,14 +164,6 @@ export default function RemindersScreen() {
     (r.kind === "custom" && (r.status === "overdue" || r.status === "soon")) ||
     (r.kind === "birthday" && r.days <= 7)
   ).length;
-
-  const openAddModal = () => {
-    setSelectedPetId(pets[0]?.id ?? "");
-    setReminderType("deworming");
-    setNextDate("");
-    setNotes("");
-    setShowAddModal(true);
-  };
 
   const handleSaveReminder = async () => {
     if (!selectedPetId || !nextDate) {
@@ -199,7 +222,7 @@ export default function RemindersScreen() {
     const typeIcon = item.kind === "custom" ? getReminderTypeCfg(item.reminder.type).icon : cfg.icon;
 
     return (
-      <Animated.View entering={FadeInDown.delay(index * 60).springify()}>
+      <Reanimated.View entering={FadeInDown.delay(index * 60).springify()}>
         <Pressable onPress={handlePress} style={styles.card}>
           <View style={[styles.statusBar, { backgroundColor: cfg.color }]} />
           <View style={[styles.statusIcon, { backgroundColor: cfg.bg }]}>
@@ -236,7 +259,7 @@ export default function RemindersScreen() {
             </Text>
           </View>
         </Pressable>
-      </Animated.View>
+      </Reanimated.View>
     );
   }
 
@@ -247,7 +270,7 @@ export default function RemindersScreen() {
           colors={[Colors.gradientStart, Colors.gradientEnd]}
           style={[styles.header, { paddingTop: topInset + 12 }]}
         >
-          <Animated.View entering={FadeInUp.delay(50)} style={styles.headerRow}>
+          <Reanimated.View entering={FadeInUp.delay(50)} style={styles.headerRow}>
             <View style={{ flex: 1 }}>
               <Text style={styles.headerTitle}>{t.reminders}</Text>
               <Text style={styles.headerSubtitle}>
@@ -261,7 +284,7 @@ export default function RemindersScreen() {
                 <MaterialCommunityIcons name="plus" size={22} color={Colors.textLight} />
               </Pressable>
             )}
-          </Animated.View>
+          </Reanimated.View>
 
           <View style={styles.tabs}>
             {(["all", "vaccination", "other"] as const).map(tab => (
@@ -280,7 +303,7 @@ export default function RemindersScreen() {
         </LinearGradient>
 
         {filteredItems.length === 0 ? (
-          <Animated.View entering={FadeInDown.delay(200)} style={styles.emptyContainer}>
+          <Reanimated.View entering={FadeInDown.delay(200)} style={styles.emptyContainer}>
             <View style={styles.emptyIconWrap}>
               <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.emptyIconGradient}>
                 <MaterialCommunityIcons name="bell" size={44} color={Colors.textLight} />
@@ -304,13 +327,23 @@ export default function RemindersScreen() {
                 </Text>
               </Pressable>
             )}
-          </Animated.View>
+          </Reanimated.View>
         ) : (
           <FlatList
             data={filteredItems}
             keyExtractor={(item, i) => `${item.kind}-${i}`}
             renderItem={({ item, index }) => <ReminderCard item={item} index={index} />}
             contentContainerStyle={[styles.listContent, { paddingBottom: Platform.OS === "web" ? 100 : 90 }]}
+            ListFooterComponent={
+              pets.length > 0 ? (
+                <Pressable onPress={openAddModal} style={styles.addEmptyBtn}>
+                  <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
+                  <Text style={styles.addEmptyBtnText}>
+                    {language === "uk" ? "Додати нагадування" : "Add Reminder"}
+                  </Text>
+                </Pressable>
+              ) : null
+            }
             showsVerticalScrollIndicator={false}
             ListHeaderComponent={
               urgentCount > 0 ? (
@@ -331,7 +364,7 @@ export default function RemindersScreen() {
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeModal} />
           <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"}>
-            <View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <Animated.View style={[styles.modalSheet, { paddingBottom: insets.bottom + 16, transform: [{ translateY: slideAnim }] }]}>
               <View {...handlePanResponder.panHandlers} style={styles.handleWrap}>
                 <View style={styles.modalHandle} />
               </View>
@@ -394,7 +427,7 @@ export default function RemindersScreen() {
                   multiline
                 />
               </ScrollView>
-            </View>
+              </Animated.View>
           </KeyboardAvoidingView>
         </View>
       </Modal>
@@ -451,6 +484,7 @@ const styles = StyleSheet.create({
   addEmptyBtn: {
     backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 14,
     borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 8,
+    justifyContent: "center",
   },
   addEmptyBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.textLight },
   modalOverlay: { flex: 1, justifyContent: "flex-end" },
