@@ -18,9 +18,11 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function RegisterScreen() {
   const { register } = useAuth();
+  const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -32,17 +34,18 @@ export default function RegisterScreen() {
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
   const confirmRef = useRef<TextInput>(null);
+
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password) {
-      Alert.alert("", "Будь ласка, заповніть всі поля");
+      Alert.alert("", language === "uk" ? "Будь ласка, заповніть всі поля" : "Please fill in all fields");
       return;
     }
     if (password.length < 6) {
-      Alert.alert("", "Пароль має містити мінімум 6 символів");
+      Alert.alert("", language === "uk" ? "Пароль має містити мінімум 6 символів" : "Password must be at least 6 characters");
       return;
     }
     if (password !== confirm) {
-      Alert.alert("", "Паролі не збігаються");
+      Alert.alert("", language === "uk" ? "Паролі не збігаються" : "Passwords do not match");
       return;
     }
     setLoading(true);
@@ -50,19 +53,22 @@ export default function RegisterScreen() {
     const { error, needsConfirmation } = await register(email, password, name);
     setLoading(false);
     if (error) {
-      Alert.alert("Помилка реєстрації", translateError(error));
+      Alert.alert(
+        language === "uk" ? "Помилка реєстрації" : "Registration Error",
+        translateError(error, language)
+      );
     } else if (needsConfirmation) {
-      // Email confirmation required — tell the user to check their inbox
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       Alert.alert(
-        "Перевірте пошту 📧",
-        `Ми надіслали листа на ${email}.\n\nПідтвердіть реєстрацію, перейшовши за посиланням у листі, а потім увійдіть.`,
-        [{ text: "Увійти", onPress: () => router.replace("/(auth)/login") }]
+        language === "uk" ? "Перевірте пошту 📧" : "Check your inbox 📧",
+        language === "uk"
+          ? `Ми надіслали листа на ${email}.\n\nПідтвердіть реєстрацію, перейшовши за посиланням у листі, а потім увійдіть.`
+          : `We sent a confirmation link to ${email}.\n\nClick the link in the email, then sign in.`,
+        [{ text: language === "uk" ? "Увійти" : "Sign In", onPress: () => router.replace("/(auth)/login") }]
       );
     } else {
-      // Auto-logged in — keep loading=true so screen doesn't flicker before AuthGuard redirects
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setLoading(true); // will unmount when redirected
+      setLoading(true);
     }
   };
 
@@ -79,7 +85,7 @@ export default function RegisterScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#FFFAF6" />
         </Pressable>
-        <Text style={styles.headerTitle}>Реєстрація</Text>
+        <Text style={styles.headerTitle}>{language === "uk" ? "Реєстрація" : "Sign Up"}</Text>
         <View style={{ width: 40 }} />
       </LinearGradient>
 
@@ -89,13 +95,19 @@ export default function RegisterScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.content}>
-          <Text style={styles.greeting}>Приєднуйтесь до Хвостика 🐾</Text>
-          <Text style={styles.subGreeting}>Створіть акаунт і почніть дбати про своїх улюбленців</Text>
+          <Text style={styles.greeting}>
+            {language === "uk" ? "Приєднуйтесь до Хвостика 🐾" : "Join Tailsy 🐾"}
+          </Text>
+          <Text style={styles.subGreeting}>
+            {language === "uk"
+              ? "Створіть акаунт і почніть дбати про своїх улюбленців"
+              : "Create an account and start caring for your pets"}
+          </Text>
 
           <View style={styles.card}>
             {/* Name */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Ваше ім'я</Text>
+              <Text style={styles.label}>{language === "uk" ? "Ваше ім'я" : "Your name"}</Text>
               <View style={styles.inputWrap}>
                 <MaterialCommunityIcons name="account-outline" size={18} color="#C4956A" />
                 <TextInput
@@ -103,7 +115,7 @@ export default function RegisterScreen() {
                   ref={nameRef}
                   value={name}
                   onChangeText={setName}
-                  placeholder="Як вас звати?"
+                  placeholder={language === "uk" ? "Як вас звати?" : "What's your name?"}
                   placeholderTextColor="#C4A882"
                   autoComplete="name"
                   autoCapitalize="words"
@@ -141,7 +153,7 @@ export default function RegisterScreen() {
 
             {/* Password */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Пароль</Text>
+              <Text style={styles.label}>{language === "uk" ? "Пароль" : "Password"}</Text>
               <View style={styles.inputWrap}>
                 <MaterialCommunityIcons name="lock-outline" size={18} color="#C4956A" />
                 <TextInput
@@ -149,7 +161,7 @@ export default function RegisterScreen() {
                   ref={passwordRef}
                   value={password}
                   onChangeText={setPassword}
-                  placeholder="Мінімум 6 символів"
+                  placeholder={language === "uk" ? "Мінімум 6 символів" : "At least 6 characters"}
                   placeholderTextColor="#C4A882"
                   keyboardType="ascii-capable"
                   textContentType="password"
@@ -166,7 +178,7 @@ export default function RegisterScreen() {
 
             {/* Confirm password */}
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Підтвердіть пароль</Text>
+              <Text style={styles.label}>{language === "uk" ? "Підтвердіть пароль" : "Confirm password"}</Text>
               <View style={styles.inputWrap}>
                 <MaterialCommunityIcons name="shield-check-outline" size={18} color="#C4956A" />
                 <TextInput
@@ -174,7 +186,7 @@ export default function RegisterScreen() {
                   ref={confirmRef}
                   value={confirm}
                   onChangeText={setConfirm}
-                  placeholder="Повторіть пароль"
+                  placeholder={language === "uk" ? "Повторіть пароль" : "Repeat password"}
                   placeholderTextColor="#C4A882"
                   keyboardType="ascii-capable"
                   textContentType="password"
@@ -188,14 +200,18 @@ export default function RegisterScreen() {
 
           <Pressable onPress={handleRegister} disabled={loading} style={styles.ctaWrap}>
             <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.cta}>
-              <Text style={styles.ctaText}>{loading ? "Реєструємо..." : "Створити акаунт"}</Text>
+              <Text style={styles.ctaText}>
+                {loading
+                  ? (language === "uk" ? "Реєструємо..." : "Creating account...")
+                  : (language === "uk" ? "Створити акаунт" : "Create Account")}
+              </Text>
             </LinearGradient>
           </Pressable>
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchText}>Вже є акаунт? </Text>
+            <Text style={styles.switchText}>{language === "uk" ? "Вже є акаунт? " : "Already have an account? "}</Text>
             <Pressable onPress={() => router.push("/(auth)/login")}>
-              <Text style={styles.switchLink}>Увійти</Text>
+              <Text style={styles.switchLink}>{language === "uk" ? "Увійти" : "Sign In"}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -204,10 +220,13 @@ export default function RegisterScreen() {
   );
 }
 
-function translateError(msg: string): string {
-  if (msg.includes("already registered")) return "Цей email вже зареєстровано";
-  if (msg.includes("Password should be")) return "Пароль має містити мінімум 6 символів";
-  if (msg.includes("invalid email")) return "Невірний формат email";
+function translateError(msg: string, lang: string): string {
+  if (msg.includes("already registered"))
+    return lang === "uk" ? "Цей email вже зареєстровано" : "This email is already registered";
+  if (msg.includes("Password should be"))
+    return lang === "uk" ? "Пароль має містити мінімум 6 символів" : "Password must be at least 6 characters";
+  if (msg.includes("invalid email"))
+    return lang === "uk" ? "Невірний формат email" : "Invalid email format";
   return msg;
 }
 

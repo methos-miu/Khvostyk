@@ -18,19 +18,22 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const passwordRef = useRef<TextInput>(null);
+
   const handleLogin = async () => {
     if (!email.trim() || !password) {
-      Alert.alert("", "Будь ласка, заповніть всі поля");
+      Alert.alert("", language === "uk" ? "Будь ласка, заповніть всі поля" : "Please fill in all fields");
       return;
     }
     setLoading(true);
@@ -38,7 +41,10 @@ export default function LoginScreen() {
     const { error } = await login(email, password);
     setLoading(false);
     if (error) {
-      Alert.alert("Помилка входу", translateError(error));
+      Alert.alert(
+        language === "uk" ? "Помилка входу" : "Login Error",
+        translateError(error, language)
+      );
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -57,7 +63,7 @@ export default function LoginScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#FFFAF6" />
         </Pressable>
-        <Text style={styles.headerTitle}>Вхід</Text>
+        <Text style={styles.headerTitle}>{language === "uk" ? "Вхід" : "Login"}</Text>
         <View style={{ width: 40 }} />
       </LinearGradient>
 
@@ -67,8 +73,12 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
       >
         <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.content}>
-          <Text style={styles.greeting}>З поверненням! 👋</Text>
-          <Text style={styles.subGreeting}>Увійдіть, щоб продовжити піклуватися про своїх улюбленців</Text>
+          <Text style={styles.greeting}>{language === "uk" ? "З поверненням! 👋" : "Welcome back! 👋"}</Text>
+          <Text style={styles.subGreeting}>
+            {language === "uk"
+              ? "Увійдіть, щоб продовжити піклуватися про своїх улюбленців"
+              : "Sign in to continue caring for your pets"}
+          </Text>
 
           <View style={styles.card}>
             <View style={styles.inputGroup}>
@@ -87,8 +97,6 @@ export default function LoginScreen() {
                   autoCorrect={false}
                   returnKeyType="next"
                   onSubmitEditing={() => passwordRef.current?.focus()}
-                  returnKeyType="next"
-                  onSubmitEditing={() => passwordRef.current?.focus()}
                 />
               </View>
             </View>
@@ -96,7 +104,7 @@ export default function LoginScreen() {
             <View style={styles.divider} />
 
             <View style={styles.inputGroup}>
-              <Text style={styles.label}>Пароль</Text>
+              <Text style={styles.label}>{language === "uk" ? "Пароль" : "Password"}</Text>
               <View style={styles.inputWrap}>
                 <MaterialCommunityIcons name="lock-outline" size={18} color="#C4956A" style={styles.inputIcon} />
                 <TextInput
@@ -104,7 +112,7 @@ export default function LoginScreen() {
                   ref={passwordRef}
                   value={password}
                   onChangeText={setPassword}
-                  placeholder="Ваш пароль"
+                  placeholder={language === "uk" ? "Ваш пароль" : "Your password"}
                   placeholderTextColor="#C4A882"
                   keyboardType="ascii-capable"
                   textContentType="password"
@@ -124,19 +132,23 @@ export default function LoginScreen() {
             onPress={() => router.push("/(auth)/forgot-password")}
             style={styles.forgotBtn}
           >
-            <Text style={styles.forgotText}>Забули пароль?</Text>
+            <Text style={styles.forgotText}>{language === "uk" ? "Забули пароль?" : "Forgot password?"}</Text>
           </Pressable>
 
           <Pressable onPress={handleLogin} disabled={loading} style={styles.ctaWrap}>
             <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.cta}>
-              <Text style={styles.ctaText}>{loading ? "Входимо..." : "Увійти"}</Text>
+              <Text style={styles.ctaText}>
+                {loading
+                  ? (language === "uk" ? "Входимо..." : "Signing in...")
+                  : (language === "uk" ? "Увійти" : "Sign In")}
+              </Text>
             </LinearGradient>
           </Pressable>
 
           <View style={styles.switchRow}>
-            <Text style={styles.switchText}>Немає акаунту? </Text>
+            <Text style={styles.switchText}>{language === "uk" ? "Немає акаунту? " : "Don't have an account? "}</Text>
             <Pressable onPress={() => router.push("/(auth)/register")}>
-              <Text style={styles.switchLink}>Зареєструватися</Text>
+              <Text style={styles.switchLink}>{language === "uk" ? "Зареєструватися" : "Sign Up"}</Text>
             </Pressable>
           </View>
 
@@ -147,10 +159,13 @@ export default function LoginScreen() {
   );
 }
 
-function translateError(msg: string): string {
-  if (msg.includes("Invalid login")) return "Невірний email або пароль";
-  if (msg.includes("Email not confirmed")) return "Підтвердіть email перед входом";
-  if (msg.includes("too many requests")) return "Забагато спроб. Спробуйте пізніше";
+function translateError(msg: string, lang: string): string {
+  if (msg.includes("Invalid login"))
+    return lang === "uk" ? "Невірний email або пароль" : "Incorrect email or password";
+  if (msg.includes("Email not confirmed"))
+    return lang === "uk" ? "Підтвердіть email перед входом" : "Please confirm your email before signing in";
+  if (msg.includes("too many requests"))
+    return lang === "uk" ? "Забагато спроб. Спробуйте пізніше" : "Too many attempts. Please try again later";
   return msg;
 }
 
