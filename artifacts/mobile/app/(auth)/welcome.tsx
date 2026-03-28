@@ -27,9 +27,9 @@ export default function WelcomeScreen() {
       {/* Top hero with gradient */}
       <LinearGradient
         colors={["#52280D", "#3D1C02"]}
-        style={[styles.hero, { paddingTop: insets.top + 20 }]}
+        style={styles.hero}
       >
-        <Animated.View entering={FadeInUp.delay(100).springify()}>
+        <Animated.View entering={FadeInUp.delay(100).springify()} style={{ width: "100%", height: "100%" }}>
           <Image
             source={language === "uk" ? require("../../assets/logo-uk.png") : require("../../assets/logo-en.png")}
             style={styles.logoBig}
@@ -96,13 +96,11 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFFAF6" },
   hero: {
     height: height * 0.48,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
     overflow: "hidden",
     position: "relative",
+    backgroundColor: "#3D1C02",
   },
-  logoBig: { width: 280, height: 280 },
+  logoBig: { width: "100%", height: "100%" },
   paw: { position: "absolute", fontFamily: "System" },
   panel: {
     paddingHorizontal: 24, paddingTop: 24, gap: 16,
