@@ -245,8 +245,21 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         weights.data ?? [],
         reminders.data ?? []
       );
-      setPets(assembled);
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(assembled));
+
+      const petsWithPhotos = await Promise.all(
+        assembled.map(async (pet) => {
+          if (pet.photoUri) {
+            const { data: signed } = await supabase.storage
+              .from("pet-photos")
+              .createSignedUrl(pet.photoUri, 3600);
+            return { ...pet, photoUri: signed?.signedUrl ?? undefined };
+          }
+          return pet;
+        })
+      );
+
+      setPets(petsWithPhotos);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(petsWithPhotos));
     } catch (e) {
       console.warn("Supabase sync failed (offline?)", e);
     } finally {

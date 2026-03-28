@@ -171,14 +171,17 @@ export default function AddPetScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       let photoUrl = form.photoUri;
       if (form.photoUri && form.photoUri.startsWith("file")) {
-        const ext = form.photoUri.split(".").pop() ?? "jpg";
-        const fileName = `${Date.now()}${Math.random().toString(36).substr(2, 9)}.${ext}`;
-        const response = await fetch(form.photoUri);
-        const blob = await response.blob();
-        const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, blob, { contentType: `image/${ext}` });
-        if (!error && data) {
-          const { data: urlData } = supabase.storage.from("pet-photos").getPublicUrl(data.path);
-          photoUrl = urlData.publicUrl;
+        const { data: { user } } = await supabase.auth.getUser();
+        const uid = user?.id;
+        if (uid) {
+          const ext = form.photoUri.split(".").pop() ?? "jpg";
+          const fileName = `${uid}/${Date.now()}.${ext}`;
+          const response = await fetch(form.photoUri);
+          const blob = await response.blob();
+          const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, blob, { contentType: `image/${ext}` });
+          if (!error && data) {
+            photoUrl = data.path;
+          }
         }
       }
       await addPet({
