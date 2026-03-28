@@ -99,8 +99,10 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
     backgroundColor: "#3D1C02",
+    padding: 0,
+    paddingTop: 0,
   },
-  logoBig: { width: "100%", height: "100%" },
+  logoBig: { width: "100%", height: "100%", margin: 0, padding: 0 },
   paw: { position: "absolute", fontFamily: "System" },
   panel: {
     paddingHorizontal: 24, paddingTop: 24, gap: 16,
