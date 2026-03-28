@@ -95,7 +95,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFFAF6" },
   hero: {
-    height: height * 0.48,
+    height: height * 0.42,
     overflow: "hidden",
     position: "relative",
     backgroundColor: "#3D1C02",
