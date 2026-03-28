@@ -109,6 +109,15 @@ function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).substr(2, 9);
 }
 
+function extractStoragePath(photoUri?: string): string | undefined {
+  if (!photoUri) return undefined;
+  if (!photoUri.startsWith("https://")) return photoUri;
+  const marker = "/pet-photos/";
+  const idx = photoUri.indexOf(marker);
+  if (idx === -1) return undefined;
+  return photoUri.slice(idx + marker.length).split("?")[0];
+}
+
 function migratePet(raw: any): Pet {
   return {
     id: raw.id ?? generateId(),
@@ -248,13 +257,14 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
       const petsWithPhotos = await Promise.all(
         assembled.map(async (pet) => {
-          if (pet.photoUri) {
+          const storagePath = extractStoragePath(pet.photoUri);
+          if (storagePath) {
             const { data: signed } = await supabase.storage
               .from("pet-photos")
-              .createSignedUrl(pet.photoUri, 3600);
+              .createSignedUrl(storagePath, 3600);
             return { ...pet, photoUri: signed?.signedUrl ?? undefined };
           }
-          return pet;
+          return { ...pet, photoUri: undefined };
         })
       );
 
@@ -295,7 +305,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           species: newPet.species, custom_species: newPet.customSpecies ?? null,
           breed: newPet.breed, birthdate: newPet.birthdate, weight: newPet.weight,
           gender: newPet.gender, color: newPet.color ?? null,
-          photo_url: newPet.photoUri ?? null,
+          photo_url: extractStoragePath(newPet.photoUri) ?? null,
           medical_profile: newPet.medicalProfile ?? null,
           created_at: newPet.createdAt,
         }).then(({ error }) => { if (error) console.warn("Supabase addPet:", error.message); });
@@ -318,7 +328,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           custom_species: updates.customSpecies ?? null,
           breed: updates.breed, birthdate: updates.birthdate, weight: updates.weight,
           gender: updates.gender, color: updates.color ?? null,
-          photo_url: updates.photoUri ?? null,
+          photo_url: extractStoragePath(updates.photoUri) ?? null,
           medical_profile: updates.medicalProfile ?? null,
           updated_at: new Date().toISOString(),
         }).eq("id", id).then(({ error }) => { if (error) console.warn("Supabase updatePet:", error.message); });

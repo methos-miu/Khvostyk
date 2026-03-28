@@ -220,8 +220,7 @@ export default function EditPetScreen() {
           const blob = await response.blob();
           const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, blob, { contentType: `image/${ext}` });
           if (!error && data) {
-            const { data: signed } = await supabase.storage.from("pet-photos").createSignedUrl(data.path, 3600);
-            photoUrl = signed?.signedUrl ?? data.path;
+            photoUrl = data.path;
           }
         }
       }
