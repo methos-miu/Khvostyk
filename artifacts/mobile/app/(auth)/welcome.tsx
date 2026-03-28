@@ -38,7 +38,9 @@ export default function WelcomeScreen() {
         </Animated.View>
         <Animated.View entering={FadeInUp.delay(220).springify()}>
           <Text style={styles.brand}>Хвостик</Text>
-          <Text style={styles.tagline}>Ваш помічник у догляді{"\n"}за домашніми улюбленцями</Text>
+          <Text style={styles.tagline}>
+            {language === "uk" ? "Ваш помічник у догляді\nза домашніми улюбленцями" : "Your pet care assistant"}
+          </Text>
         </Animated.View>
 
         <Text style={[styles.paw, { bottom: 40, right: 30, opacity: 0.15, fontSize: 64 }]}>🐾</Text>
@@ -56,14 +58,19 @@ export default function WelcomeScreen() {
       >
         <Animated.View entering={FadeInDown.delay(300).springify()}>
           <View style={styles.featureRow}>
-            {["💉 Вакцини", "📄 Документи", "⏰ Нагадування"].map(f => (
+            {(language === "uk"
+              ? ["💉 Вакцини", "📄 Документи", "⏰ Нагадування"]
+              : ["💉 Vaccines", "📄 Documents", "⏰ Reminders"]
+            ).map(f => (
               <View key={f} style={styles.featureChip}>
                 <Text style={styles.featureText}>{f}</Text>
               </View>
             ))}
           </View>
           <Text style={styles.subtitle}>
-            Зберігайте медичну карту, нагадування про щеплення та документи ваших улюбленців — все в одному місці.
+            {language === "uk"
+              ? "Зберігайте медичну карту, нагадування про щеплення та документи ваших улюбленців — все в одному місці."
+              : "Store medical records, vaccination reminders and documents for your pets — all in one place."}
           </Text>
         </Animated.View>
 
@@ -73,7 +80,7 @@ export default function WelcomeScreen() {
             style={styles.btnPrimary}
           >
             <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.btnGradient}>
-              <Text style={styles.btnPrimaryText}>Створити акаунт</Text>
+              <Text style={styles.btnPrimaryText}>{language === "uk" ? "Створити акаунт" : "Create Account"}</Text>
             </LinearGradient>
           </Pressable>
 
@@ -81,7 +88,7 @@ export default function WelcomeScreen() {
             onPress={() => router.push("/(auth)/login")}
             style={styles.btnSecondary}
           >
-            <Text style={styles.btnSecondaryText}>Вже є акаунт? Увійти</Text>
+            <Text style={styles.btnSecondaryText}>{language === "uk" ? "Вже є акаунт? Увійти" : "Already have an account? Sign In"}</Text>
           </Pressable>
 
           <SocialAuthButtons />
