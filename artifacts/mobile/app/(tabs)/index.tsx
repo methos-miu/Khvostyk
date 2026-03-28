@@ -207,6 +207,7 @@ export default function HomeScreen() {
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
+                <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
                 <Text style={styles.addButtonText}>{t.addPet}</Text>
               </LinearGradient>
             </Pressable>
