@@ -37,7 +37,7 @@ export default function WelcomeScreen() {
           />
         </Animated.View>
         <Animated.View entering={FadeInUp.delay(220).springify()}>
-          <Text style={styles.brand}>Хвостик</Text>
+          <Text style={styles.brand}>{language === "uk" ? "Хвостик" : "Tailsy"}</Text>
           <Text style={styles.tagline}>
             {language === "uk" ? "Ваш помічник у догляді\nза домашніми улюбленцями" : "Your pet care assistant"}
           </Text>
@@ -91,7 +91,7 @@ export default function WelcomeScreen() {
             <Text style={styles.btnSecondaryText}>{language === "uk" ? "Вже є акаунт? Увійти" : "Already have an account? Sign In"}</Text>
           </Pressable>
 
-          <SocialAuthButtons />
+          <SocialAuthButtons language={language} />
         </Animated.View>
       </ScrollView>
     </View>

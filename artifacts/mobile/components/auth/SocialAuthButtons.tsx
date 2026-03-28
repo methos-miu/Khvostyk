@@ -41,9 +41,10 @@ const icon = StyleSheet.create({
 
 interface Props {
   showApple?: boolean;
+  language?: string;
 }
 
-export default function SocialAuthButtons({ showApple = true }: Props) {
+export default function SocialAuthButtons({ showApple = true, language = "uk" }: Props) {
   const { signInWithProvider, signInWithApple } = useAuth();
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
@@ -74,7 +75,7 @@ export default function SocialAuthButtons({ showApple = true }: Props) {
     <View style={styles.container}>
       <View style={styles.dividerRow}>
         <View style={styles.dividerLine} />
-        <Text style={styles.dividerText}>або</Text>
+        <Text style={styles.dividerText}>{language === "uk" ? "або" : "or"}</Text>
         <View style={styles.dividerLine} />
       </View>
 
@@ -88,7 +89,7 @@ export default function SocialAuthButtons({ showApple = true }: Props) {
         ) : (
           <GoogleIcon />
         )}
-        <Text style={styles.btnText}>Увійти через Google</Text>
+        <Text style={styles.btnText}>{language === "uk" ? "Увійти через Google" : "Sign in with Google"}</Text>
       </Pressable>
 
       <Pressable
@@ -101,7 +102,7 @@ export default function SocialAuthButtons({ showApple = true }: Props) {
         ) : (
           <FacebookIcon />
         )}
-        <Text style={[styles.btnText, styles.facebookText]}>Увійти через Facebook</Text>
+        <Text style={[styles.btnText, styles.facebookText]}>{language === "uk" ? "Увійти через Facebook" : "Sign in with Facebook"}</Text>
       </Pressable>
 
       {showApple && isIOS && (
