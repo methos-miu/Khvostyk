@@ -29,18 +29,12 @@ export default function WelcomeScreen() {
         colors={["#52280D", "#3D1C02"]}
         style={[styles.hero, { paddingTop: insets.top + 20 }]}
       >
-        <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.logoWrap}>
+        <Animated.View entering={FadeInUp.delay(100).springify()}>
           <Image
-            source={require("../../assets/logo.png")}
-            style={styles.logo}
+            source={language === "uk" ? require("../../assets/logo-uk.png") : require("../../assets/logo-en.png")}
+            style={styles.logoBig}
             contentFit="contain"
           />
-        </Animated.View>
-        <Animated.View entering={FadeInUp.delay(220).springify()}>
-          <Text style={styles.brand}>{language === "uk" ? "Хвостик" : "Tailsy"}</Text>
-          <Text style={styles.tagline}>
-            {language === "uk" ? "Ваш помічник у догляді\nза домашніми улюбленцями" : "Your pet care assistant"}
-          </Text>
         </Animated.View>
 
         <Text style={[styles.paw, { bottom: 40, right: 30, opacity: 0.15, fontSize: 64 }]}>🐾</Text>
@@ -108,21 +102,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
-  logoWrap: {
-    width: 110, height: 110, borderRadius: 32,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    alignItems: "center", justifyContent: "center",
-    marginBottom: 8,
-  },
-  logo: { width: 80, height: 80 },
-  brand: {
-    fontSize: 40, fontFamily: "Inter_700Bold",
-    color: "#FFFAF6", textAlign: "center", letterSpacing: 2,
-  },
-  tagline: {
-    fontSize: 15, fontFamily: "Inter_400Regular",
-    color: "rgba(255,250,246,0.75)", textAlign: "center", lineHeight: 22,
-  },
+  logoBig: { width: 280, height: 280 },
   paw: { position: "absolute", fontFamily: "System" },
   panel: {
     paddingHorizontal: 24, paddingTop: 24, gap: 16,
