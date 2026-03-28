@@ -101,8 +101,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#3D1C02",
     padding: 0,
     paddingTop: 0,
+    paddingHorizontal: 0,
+    paddingLeft: 0,
+    paddingRight: 0,
   },
-  logoBig: { width: "100%", height: "100%", margin: 0, padding: 0 },
+  logoBig: { width: "100%", height: "100%", margin: 0, marginHorizontal: 0, padding: 0 },
   paw: { position: "absolute", fontFamily: "System" },
   panel: {
     paddingHorizontal: 24, paddingTop: 24, gap: 16,
