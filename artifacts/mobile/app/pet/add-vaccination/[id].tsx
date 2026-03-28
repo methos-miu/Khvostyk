@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import React, { useLayoutEffect, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -57,6 +58,27 @@ export default function AddVaccinationScreen() {
     vetName: "",
     notes: "",
   });
+
+  const navigation = useNavigation();
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <Pressable onPress={() => router.back()} style={{ marginLeft: 4 }}>
+          <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
+            {language === "uk" ? "Скасувати" : "Cancel"}
+          </Text>
+        </Pressable>
+      ),
+      headerRight: () => (
+        <Pressable onPress={handleSave} style={{ marginRight: 4 }}>
+          <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.primary }}>
+            {language === "uk" ? "Зберегти" : "Save"}
+          </Text>
+        </Pressable>
+      ),
+    });
+  }, [navigation, language, form, loading]);
 
   const updateForm = (key: keyof FormData, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
