@@ -22,6 +22,7 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { supabase } from "@/lib/supabase";
 import { Colors } from "@/constants/colors";
 import {
   CAT_BREEDS_UK, CAT_BREEDS_EN,
@@ -208,6 +209,22 @@ export default function EditPetScreen() {
     setLoading(true);
     try {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      let photoUrl = form.photoUri;
+      if (form.photoUri && form.photoUri.startsWith("file")) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const uid = user?.id;
+        if (uid) {
+          const ext = form.photoUri.split(".").pop() ?? "jpg";
+          const fileName = `${uid}/${Date.now()}.${ext}`;
+          const response = await fetch(form.photoUri);
+          const blob = await response.blob();
+          const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, blob, { contentType: `image/${ext}` });
+          if (!error && data) {
+            const { data: signed } = await supabase.storage.from("pet-photos").createSignedUrl(data.path, 3600);
+            photoUrl = signed?.signedUrl ?? data.path;
+          }
+        }
+      }
       await updatePet(pet.id, {
         name: form.name.trim(),
         species: form.species,
@@ -216,7 +233,7 @@ export default function EditPetScreen() {
         birthdate: form.birthdate,
         weight: form.weight.trim(),
         color: form.color.trim(),
-        photoUri: form.photoUri,
+        photoUri: photoUrl,
         gender: form.gender,
       });
       router.back();
