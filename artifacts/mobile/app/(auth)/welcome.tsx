@@ -3,20 +3,16 @@ import { router } from "expo-router";
 import { Image } from "expo-image";
 import React from "react";
 import {
-  Dimensions,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
 import { useLanguage } from "@/context/LanguageContext";
-
-const { height } = Dimensions.get("window");
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
@@ -24,25 +20,20 @@ export default function WelcomeScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Top hero with gradient */}
-      <LinearGradient
-        colors={["#52280D", "#3D1C02"]}
-        style={styles.hero}
-      >
-        <Animated.View entering={FadeInUp.delay(100).springify()} style={{ width: "100%", height: "100%" }}>
-          <Image
-            source={language === "uk" ? require("../../assets/logo-uk.png") : require("../../assets/logo-en.png")}
-            style={styles.logoBig}
-            contentFit="contain"
-          />
-        </Animated.View>
-
-        <Text style={[styles.paw, { bottom: 40, right: 30, opacity: 0.15, fontSize: 64 }]}>🐾</Text>
-        <Text style={[styles.paw, { bottom: 80, left: 20, opacity: 0.1, fontSize: 44 }]}>🐾</Text>
-        <Pressable onPress={() => setLanguage(language === "uk" ? "en" : "uk")} style={[styles.langToggle, { top: insets.top + 16, right: 16 }]}>
+      {/* Hero image */}
+      <View style={styles.heroWrap}>
+        <Image
+          source={language === "uk" ? require("../../assets/logo-uk.png") : require("../../assets/logo-en.png")}
+          style={styles.heroImage}
+          contentFit="cover"
+        />
+        <Pressable
+          onPress={() => setLanguage(language === "uk" ? "en" : "uk")}
+          style={[styles.langToggle, { top: insets.top + 16, right: 16, zIndex: 10 }]}
+        >
           <Text style={styles.langToggleText}>{language === "uk" ? "EN" : "УКР"}</Text>
         </Pressable>
-      </LinearGradient>
+      </View>
 
       {/* Bottom panel — scrollable so social buttons are reachable on small screens */}
       <ScrollView
@@ -94,19 +85,8 @@ export default function WelcomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFFAF6" },
-  hero: {
-    height: height * 0.42,
-    overflow: "hidden",
-    position: "relative",
-    backgroundColor: "#3D1C02",
-    padding: 0,
-    paddingTop: 0,
-    paddingHorizontal: 0,
-    paddingLeft: 0,
-    paddingRight: 0,
-  },
-  logoBig: { width: "100%", height: "100%", margin: 0, marginHorizontal: 0, padding: 0 },
-  paw: { position: "absolute", fontFamily: "System" },
+  heroWrap: { position: "relative", width: "100%" },
+  heroImage: { width: "100%", aspectRatio: 1, margin: 0, padding: 0 },
   panel: {
     paddingHorizontal: 24, paddingTop: 24, gap: 16,
   },
