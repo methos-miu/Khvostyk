@@ -28,6 +28,11 @@ export default function VaccinationsScreen() {
 
   const pet = getPet(id);
 
+  const handleAddVaccination = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: "/pet/add-vaccination/[id]", params: { id } });
+  };
+
   useLayoutEffect(() => {
     navigation.setOptions({
       title: `${t.vaccinations} • ${pet?.name ?? ""}`,
@@ -143,6 +148,10 @@ export default function VaccinationsScreen() {
               ? `Додайте першу вакцинацію для ${pet.name}`
               : `Add the first vaccination for ${pet.name}`}
           </Text>
+          <Pressable onPress={handleAddVaccination} style={styles.addBtn}>
+            <MaterialCommunityIcons name="plus-circle" size={20} color="#FFFAF6" />
+            <Text style={styles.addBtnText}>{language === "uk" ? "Додати вакцинацію" : "Add Vaccination"}</Text>
+          </Pressable>
         </View>
       ) : (
         <FlatList
@@ -151,6 +160,12 @@ export default function VaccinationsScreen() {
           renderItem={({ item, index }) => <VaccinationItem item={item} index={index} />}
           contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 24 }]}
           showsVerticalScrollIndicator={false}
+          ListFooterComponent={
+            <Pressable onPress={handleAddVaccination} style={styles.addBtn}>
+              <MaterialCommunityIcons name="plus-circle" size={20} color="#FFFAF6" />
+              <Text style={styles.addBtnText}>{language === "uk" ? "Додати вакцинацію" : "Add Vaccination"}</Text>
+            </Pressable>
+          }
         />
       )}
     </View>
@@ -193,4 +208,10 @@ const styles = StyleSheet.create({
     fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary,
     textAlign: "center", marginBottom: 8, lineHeight: 20,
   },
+  addBtn: {
+    backgroundColor: "#E8651A", paddingHorizontal: 24, paddingVertical: 14,
+    borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 8,
+    justifyContent: "center", marginTop: 16,
+  },
+  addBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#FFFAF6" },
 });
