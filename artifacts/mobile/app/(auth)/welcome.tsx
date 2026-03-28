@@ -14,11 +14,13 @@ import {
 import Animated, { FadeInDown, FadeInUp } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import SocialAuthButtons from "@/components/auth/SocialAuthButtons";
+import { useLanguage } from "@/context/LanguageContext";
 
 const { height } = Dimensions.get("window");
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const { language, setLanguage } = useLanguage();
 
   return (
     <View style={styles.root}>
@@ -41,6 +43,9 @@ export default function WelcomeScreen() {
 
         <Text style={[styles.paw, { bottom: 40, right: 30, opacity: 0.15, fontSize: 64 }]}>🐾</Text>
         <Text style={[styles.paw, { bottom: 80, left: 20, opacity: 0.1, fontSize: 44 }]}>🐾</Text>
+        <Pressable onPress={() => setLanguage(language === "uk" ? "en" : "uk")} style={[styles.langToggle, { top: insets.top + 16, right: 16 }]}>
+          <Text style={styles.langToggleText}>{language === "uk" ? "EN" : "УКР"}</Text>
+        </Pressable>
       </LinearGradient>
 
       {/* Bottom panel — scrollable so social buttons are reachable on small screens */}
@@ -134,4 +139,10 @@ const styles = StyleSheet.create({
   btnPrimaryText: { fontSize: 16, fontFamily: "Inter_600SemiBold", color: "#FFFAF6" },
   btnSecondary: { paddingVertical: 14, alignItems: "center" },
   btnSecondaryText: { fontSize: 15, fontFamily: "Inter_500Medium", color: "#E8651A" },
+  langToggle: {
+    position: "absolute", backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6,
+    borderWidth: 1, borderColor: "rgba(255,255,255,0.3)",
+  },
+  langToggleText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: "#FFFAF6" },
 });
