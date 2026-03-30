@@ -262,10 +262,12 @@ export default function WeightScreen() {
           )}
         </Animated.View>
 
-        <Pressable onPress={handleAddOrPrompt} style={[styles.addBtn, { marginBottom: 16 }]}>
-          <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
-          <Text style={styles.addBtnText}>{language === "uk" ? "Додати вагу" : "Add weight"}</Text>
-        </Pressable>
+        {sorted.length > 0 && (
+          <Pressable onPress={handleAddOrPrompt} style={[styles.addBtn, { marginBottom: 16 }]}>
+            <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
+            <Text style={styles.addBtnText}>{language === "uk" ? "Додати вагу" : "Add weight"}</Text>
+          </Pressable>
+        )}
 
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>{language === "uk" ? "Журнал ваги" : "Weight Log"}</Text>
