@@ -325,13 +325,19 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
       getCurrentUserId().then(uid => {
         if (!uid) return;
+        const existing = pets.find(p => p.id === id);
+        const merged = { ...existing, ...updates };
         supabase.from("pets").update({
-          name: updates.name, species: updates.species,
-          custom_species: updates.customSpecies ?? null,
-          breed: updates.breed, birthdate: updates.birthdate, weight: updates.weight,
-          gender: updates.gender, color: updates.color !== undefined ? updates.color : null,
-          photo_url: extractStoragePath(updates.photoUri) ?? null,
-          medical_profile: updates.medicalProfile !== undefined ? updates.medicalProfile : null,
+          name: merged.name,
+          species: merged.species,
+          custom_species: merged.customSpecies ?? null,
+          breed: merged.breed,
+          birthdate: merged.birthdate,
+          weight: merged.weight,
+          gender: merged.gender ?? null,
+          color: merged.color ?? null,
+          photo_url: extractStoragePath(merged.photoUri) ?? null,
+          medical_profile: merged.medicalProfile ?? null,
           updated_at: new Date().toISOString(),
         }).eq("id", id).then(({ error }) => { if (error) console.warn("Supabase updatePet:", error.message); });
       });
