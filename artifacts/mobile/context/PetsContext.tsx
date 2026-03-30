@@ -53,11 +53,21 @@ export interface Reminder {
   notificationId?: string;
 }
 
+export interface Illness {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate?: string;
+  description?: string;
+}
+
 export interface MedicalProfile {
   allergies?: string;
   chronicConditions?: string;
   vetName?: string;
   vetPhone?: string;
+  bloodType?: string;
+  illnesses?: Illness[];
 }
 
 export interface Pet {
@@ -76,6 +86,10 @@ export interface Pet {
   weightHistory: WeightEntry[];
   reminders: Reminder[];
   medicalProfile?: MedicalProfile;
+  length?: number;
+  height?: number;
+  personality?: string;
+  description?: string;
   createdAt: string;
 }
 
@@ -90,6 +104,7 @@ interface PetsContextType {
   addDocument: (petId: string, document: Omit<Document, "id">) => Promise<void>;
   deleteDocument: (petId: string, documentId: string) => Promise<void>;
   addWeightEntry: (petId: string, entry: Omit<WeightEntry, "id">) => Promise<void>;
+  updateWeightEntry: (petId: string, entryId: string, weight: number) => Promise<void>;
   deleteWeightEntry: (petId: string, entryId: string) => Promise<void>;
   addReminder: (petId: string, reminder: Omit<Reminder, "id">) => Promise<void>;
   updateReminder: (petId: string, reminderId: string, updates: Partial<Reminder>) => Promise<void>;
@@ -135,6 +150,10 @@ function migratePet(raw: any): Pet {
     weightHistory: raw.weightHistory ?? [],
     reminders: raw.reminders ?? [],
     medicalProfile: raw.medicalProfile,
+    length: raw.length,
+    height: raw.height,
+    personality: raw.personality,
+    description: raw.description,
     createdAt: raw.createdAt ?? new Date().toISOString(),
   };
 }
@@ -164,6 +183,10 @@ function assemblePets(
     color: p.color ?? undefined,
     gender: (p.gender as Gender) ?? null,
     medicalProfile: p.medical_profile ?? undefined,
+    length: p.length ?? undefined,
+    height: p.height ?? undefined,
+    personality: p.personality ?? undefined,
+    description: p.description ?? undefined,
     createdAt: p.created_at ?? new Date().toISOString(),
     vaccinations: vaccsRows
       .filter(v => v.pet_id === p.id)
@@ -290,11 +313,18 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   // ─── PETS ─────────────────────────────────────────────────────────────────
   const addPet = useCallback(
     async (petData: Omit<Pet, "id" | "createdAt" | "vaccinations" | "documents" | "weightHistory" | "reminders">) => {
+      const today = new Date();
+      const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+      const initWeightEntry: WeightEntry | null = petData.weight
+        ? { id: generateId(), date: todayIso, weight: parseFloat(petData.weight) }
+        : null;
       const newPet: Pet = {
         ...petData,
         id: generateId(),
         createdAt: new Date().toISOString(),
-        vaccinations: [], documents: [], weightHistory: [], reminders: [],
+        vaccinations: [], documents: [],
+        weightHistory: initWeightEntry ? [initWeightEntry] : [],
+        reminders: [],
       };
       const updated = [...pets, newPet];
       setPets(updated);
@@ -309,8 +339,18 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           gender: newPet.gender, color: newPet.color ?? null,
           photo_url: extractStoragePath(newPet.photoUri) ?? null,
           medical_profile: newPet.medicalProfile ?? null,
+          length: newPet.length ?? null,
+          height: newPet.height ?? null,
+          personality: newPet.personality ?? null,
+          description: newPet.description ?? null,
           created_at: newPet.createdAt,
         }).then(({ error }) => { if (error) console.warn("Supabase addPet:", error.message); });
+        if (initWeightEntry) {
+          supabase.from("weight_entries").insert({
+            id: initWeightEntry.id, pet_id: newPet.id,
+            date: initWeightEntry.date, weight: initWeightEntry.weight,
+          }).then(({ error }) => { if (error) console.warn("Supabase addWeightEntry (init):", error.message); });
+        }
       });
       return newPet;
     },
@@ -338,6 +378,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           color: merged.color ?? null,
           photo_url: extractStoragePath(merged.photoUri) ?? null,
           medical_profile: merged.medicalProfile ?? null,
+          length: merged.length ?? null,
+          height: merged.height ?? null,
+          personality: merged.personality ?? null,
+          description: merged.description ?? null,
           updated_at: new Date().toISOString(),
         }).eq("id", id).then(({ error }) => { if (error) console.warn("Supabase updatePet:", error.message); });
       });
@@ -453,6 +497,20 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   // ─── WEIGHT ───────────────────────────────────────────────────────────────
   const addWeightEntry = useCallback(
     async (petId: string, entry: Omit<WeightEntry, "id">) => {
+      const pet = pets.find(p => p.id === petId);
+      const existing = (pet?.weightHistory ?? []).find(e => e.date === entry.date);
+      if (existing) {
+        const updated = pets.map(p =>
+          p.id === petId
+            ? { ...p, weightHistory: (p.weightHistory ?? []).map(e => e.date === entry.date ? { ...e, weight: entry.weight } : e) }
+            : p
+        );
+        setPets(updated);
+        await savePets(updated);
+        supabase.from("weight_entries").update({ weight: entry.weight }).eq("id", existing.id)
+          .then(({ error }) => { if (error) console.warn("Supabase updateWeightEntry (dedup):", error.message); });
+        return;
+      }
       const newEntry: WeightEntry = { ...entry, id: generateId() };
       const updated = pets.map(p =>
         p.id === petId
@@ -481,6 +539,21 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
       supabase.from("weight_entries").delete().eq("id", entryId)
         .then(({ error }) => { if (error) console.warn("Supabase deleteWeightEntry:", error.message); });
+    },
+    [pets]
+  );
+
+  const updateWeightEntry = useCallback(
+    async (petId: string, entryId: string, weight: number) => {
+      const updated = pets.map(p =>
+        p.id === petId
+          ? { ...p, weightHistory: (p.weightHistory ?? []).map(e => e.id === entryId ? { ...e, weight } : e) }
+          : p
+      );
+      setPets(updated);
+      await savePets(updated);
+      supabase.from("weight_entries").update({ weight }).eq("id", entryId)
+        .then(({ error }) => { if (error) console.warn("Supabase updateWeightEntry:", error.message); });
     },
     [pets]
   );
@@ -567,7 +640,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         pets, addPet, updatePet, deletePet,
         addVaccination, updateVaccination, deleteVaccination,
         addDocument, deleteDocument,
-        addWeightEntry, deleteWeightEntry,
+        addWeightEntry, updateWeightEntry, deleteWeightEntry,
         addReminder, updateReminder, deleteReminder,
         getPet, isLoaded, isSyncing,
         exportData, importData,

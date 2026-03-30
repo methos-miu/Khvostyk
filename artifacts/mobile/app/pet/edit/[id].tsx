@@ -52,9 +52,13 @@ type FormData = {
   breed: string;
   birthdate: string;
   weight: string;
+  length: string;
+  height: string;
   color: string;
   photoUri: string;
   gender: Gender;
+  personality: string;
+  description: string;
 };
 
 const LEGACY_SPECIES = ["rabbit","hamster","guinea_pig","bird","turtle","reptile","fish","ferret","hedgehog"];
@@ -62,6 +66,8 @@ const LEGACY_SPECIES = ["rabbit","hamster","guinea_pig","bird","turtle","reptile
 const WEIGHT_VALUES = Array.from({ length: 1000 }, (_, i) =>
   ((i + 1) * 0.1).toFixed(1)
 );
+const LENGTH_VALUES = Array.from({ length: 200 }, (_, i) => String(i + 1));
+const HEIGHT_VALUES = Array.from({ length: 200 }, (_, i) => String(i + 1));
 
 const ITEM_HEIGHT = 44;
 
@@ -85,14 +91,18 @@ function getBreedList(species: Species, lang: "uk" | "en"): string[] {
 
 export default function EditPetScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPet, updatePet } = usePets();
+  const { getPet, updatePet, addWeightEntry } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
   const [showBreedPicker, setShowBreedPicker] = useState(false);
   const [showWeightPicker, setShowWeightPicker] = useState(false);
+  const [showLengthPicker, setShowLengthPicker] = useState(false);
+  const [showHeightPicker, setShowHeightPicker] = useState(false);
   const [showAnimalPicker, setShowAnimalPicker] = useState(false);
   const [selectedWeight, setSelectedWeight] = useState("5.0");
+  const [selectedLength, setSelectedLength] = useState("30");
+  const [selectedHeight, setSelectedHeight] = useState("30");
 
   const pet = getPet(id);
 
@@ -114,9 +124,13 @@ export default function EditPetScreen() {
     breed: pet?.breed ?? "",
     birthdate: pet?.birthdate ?? "",
     weight: pet?.weight ?? "",
+    length: pet?.length != null ? String(pet.length) : "",
+    height: pet?.height != null ? String(pet.height) : "",
     color: pet?.color ?? "",
     photoUri: pet?.photoUri ?? "",
     gender: pet?.gender ?? null,
+    personality: pet?.personality ?? "",
+    description: pet?.description ?? "",
   });
 
   const updateForm = (key: keyof FormData, value: any) => {
@@ -154,6 +168,60 @@ export default function EditPetScreen() {
     updateForm("weight", selectedWeight);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowWeightPicker(false);
+  };
+
+  const lengthPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => { if (gs.dy > 50) setShowLengthPicker(false); },
+    })
+  ).current;
+
+  const heightPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => { if (gs.dy > 50) setShowHeightPicker(false); },
+    })
+  ).current;
+
+  const onLengthScrollEnd = (event: any) => {
+    const index = Math.max(0, Math.min(Math.round(event.nativeEvent.contentOffset.y / ITEM_HEIGHT), LENGTH_VALUES.length - 1));
+    const v = LENGTH_VALUES[index];
+    if (v !== selectedLength) { Haptics.selectionAsync(); setSelectedLength(v); }
+  };
+
+  const onHeightScrollEnd = (event: any) => {
+    const index = Math.max(0, Math.min(Math.round(event.nativeEvent.contentOffset.y / ITEM_HEIGHT), HEIGHT_VALUES.length - 1));
+    const v = HEIGHT_VALUES[index];
+    if (v !== selectedHeight) { Haptics.selectionAsync(); setSelectedHeight(v); }
+  };
+
+  const openLengthPicker = () => {
+    const init = form.length && LENGTH_VALUES.includes(form.length) ? form.length : "30";
+    setSelectedLength(init);
+    setShowLengthPicker(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const confirmLength = () => {
+    updateForm("length", selectedLength);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowLengthPicker(false);
+  };
+
+  const openHeightPicker = () => {
+    const init = form.height && HEIGHT_VALUES.includes(form.height) ? form.height : "30";
+    setSelectedHeight(init);
+    setShowHeightPicker(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const confirmHeight = () => {
+    updateForm("height", selectedHeight);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowHeightPicker(false);
   };
 
   const pickPhoto = async () => {
@@ -237,7 +305,16 @@ export default function EditPetScreen() {
         color: form.color.trim(),
         photoUri: photoUrl,
         gender: form.gender,
+        length: form.length ? Number(form.length) : undefined,
+        height: form.height ? Number(form.height) : undefined,
+        personality: form.personality.trim() || undefined,
+        description: form.description.trim() || undefined,
       });
+      if (form.weight.trim()) {
+        const today = new Date();
+        const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        await addWeightEntry(pet.id, { date: todayIso, weight: parseFloat(form.weight.trim()) });
+      }
       router.back();
     } finally {
       setLoading(false);
@@ -466,6 +543,60 @@ export default function EditPetScreen() {
                   placeholderTextColor={Colors.textTertiary}
                 />
               </View>
+              <View style={styles.divider} />
+
+              {/* Length */}
+              <Pressable onPress={openLengthPicker} style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{language === "uk" ? "Довжина (см)" : "Length (cm)"}</Text>
+                <View style={styles.pickerRow}>
+                  <Text style={[styles.input, !form.length && { color: Colors.textTertiary }]}>
+                    {form.length ? `${form.length} см` : "— см"}
+                  </Text>
+                  <MaterialCommunityIcons name="chevron-down" size={16} color={Colors.textTertiary} />
+                </View>
+              </Pressable>
+              <View style={styles.divider} />
+
+              {/* Height */}
+              <Pressable onPress={openHeightPicker} style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{language === "uk" ? "Висота (см)" : "Height (cm)"}</Text>
+                <View style={styles.pickerRow}>
+                  <Text style={[styles.input, !form.height && { color: Colors.textTertiary }]}>
+                    {form.height ? `${form.height} см` : "— см"}
+                  </Text>
+                  <MaterialCommunityIcons name="chevron-down" size={16} color={Colors.textTertiary} />
+                </View>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Personality & Description */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>{language === "uk" ? "Характер та опис" : "Personality & Description"}</Text>
+            <View style={styles.card}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{language === "uk" ? "Характер" : "Personality"}</Text>
+                <TextInput
+                  style={[styles.input, { minHeight: 44 }]}
+                  value={form.personality}
+                  onChangeText={(v) => updateForm("personality", v)}
+                  placeholder={language === "uk" ? "Напр. грайливий, лагідний, активний" : "e.g. playful, gentle, active"}
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>{language === "uk" ? "Опис" : "Description"}</Text>
+                <TextInput
+                  style={[styles.input, { minHeight: 44 }]}
+                  value={form.description}
+                  onChangeText={(v) => updateForm("description", v)}
+                  placeholder={language === "uk" ? "Додаткова інформація про тварину" : "Additional information about the pet"}
+                  placeholderTextColor={Colors.textTertiary}
+                  multiline
+                />
+              </View>
             </View>
           </View>
 
@@ -559,6 +690,87 @@ export default function EditPetScreen() {
                     ]}>
                       {item} кг
                     </Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+      {/* Length Picker Modal */}
+      <Modal visible={showLengthPicker} animationType="slide" transparent onRequestClose={() => setShowLengthPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowLengthPicker(false)} />
+          <Animated.View entering={FadeInDown.springify()} style={[styles.modalSheet, styles.weightModalSheet]}>
+            <View {...lengthPanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setShowLengthPicker(false)}>
+                <Text style={styles.modalCancel}>{language === "uk" ? "Скасувати" : "Cancel"}</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>{language === "uk" ? "Довжина" : "Length"}</Text>
+              <Pressable onPress={confirmLength}>
+                <Text style={styles.modalSave}>{language === "uk" ? "Зберегти" : "Save"}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.weightPickerContainer}>
+              <View style={styles.weightSelectionBar} />
+              <FlatList
+                data={LENGTH_VALUES}
+                keyExtractor={(item) => item}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
+                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+                initialScrollIndex={Math.max(0, LENGTH_VALUES.indexOf(selectedLength))}
+                getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
+                onScrollEndDrag={onLengthScrollEnd}
+                onMomentumScrollEnd={onLengthScrollEnd}
+                renderItem={({ item }) => (
+                  <Pressable onPress={() => { Haptics.selectionAsync(); setSelectedLength(item); }} style={styles.weightItem}>
+                    <Text style={[styles.weightItemText, selectedLength === item && styles.weightItemTextActive]}>{item} см</Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Height Picker Modal */}
+      <Modal visible={showHeightPicker} animationType="slide" transparent onRequestClose={() => setShowHeightPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowHeightPicker(false)} />
+          <Animated.View entering={FadeInDown.springify()} style={[styles.modalSheet, styles.weightModalSheet]}>
+            <View {...heightPanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setShowHeightPicker(false)}>
+                <Text style={styles.modalCancel}>{language === "uk" ? "Скасувати" : "Cancel"}</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>{language === "uk" ? "Висота" : "Height"}</Text>
+              <Pressable onPress={confirmHeight}>
+                <Text style={styles.modalSave}>{language === "uk" ? "Зберегти" : "Save"}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.weightPickerContainer}>
+              <View style={styles.weightSelectionBar} />
+              <FlatList
+                data={HEIGHT_VALUES}
+                keyExtractor={(item) => item}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
+                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+                initialScrollIndex={Math.max(0, HEIGHT_VALUES.indexOf(selectedHeight))}
+                getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
+                onScrollEndDrag={onHeightScrollEnd}
+                onMomentumScrollEnd={onHeightScrollEnd}
+                renderItem={({ item }) => (
+                  <Pressable onPress={() => { Haptics.selectionAsync(); setSelectedHeight(item); }} style={styles.weightItem}>
+                    <Text style={[styles.weightItemText, selectedHeight === item && styles.weightItemTextActive]}>{item} см</Text>
                   </Pressable>
                 )}
               />

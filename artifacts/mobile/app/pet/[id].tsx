@@ -23,7 +23,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { VaccinationBadge } from "@/components/ui/VaccinationBadge";
 import { Colors } from "@/constants/colors";
-import { usePets, MedicalProfile } from "@/context/PetsContext";
+import { usePets, MedicalProfile, Illness } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getSpeciesLabel } from "@/utils/speciesLabel";
 import { calculateAge, formatDateShort, formatDate } from "@/utils/notifications";
@@ -38,6 +38,39 @@ export default function PetProfileScreen() {
 
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
+  const [showIllnessForm, setShowIllnessForm] = useState(false);
+  const [editingIllnessId, setEditingIllnessId] = useState<string | null>(null);
+  const [illnessForm, setIllnessForm] = useState<Partial<Illness>>({});
+
+  const BLOOD_TYPES = ["A", "B", "AB", "0", "DEA 1.1+", "DEA 1.1-", "DEA 1.2+", "DEA 1.2-", "DEA 3", "DEA 4", "DEA 5", "DEA 7", "A/B"];
+
+  const openIllnessAdd = () => {
+    setEditingIllnessId(null);
+    setIllnessForm({});
+    setShowIllnessForm(true);
+  };
+
+  const openIllnessEdit = (ill: Illness) => {
+    setEditingIllnessId(ill.id);
+    setIllnessForm({ name: ill.name, startDate: ill.startDate, endDate: ill.endDate, description: ill.description });
+    setShowIllnessForm(true);
+  };
+
+  const saveIllness = () => {
+    if (!illnessForm.name?.trim()) return;
+    const illId = editingIllnessId ?? (Date.now().toString() + Math.random().toString(36).substr(2, 9));
+    const entry: Illness = { id: illId, name: illnessForm.name.trim(), startDate: illnessForm.startDate ?? "", endDate: illnessForm.endDate, description: illnessForm.description };
+    const existing = medForm.illnesses ?? [];
+    const updated = editingIllnessId
+      ? existing.map(i => i.id === editingIllnessId ? entry : i)
+      : [...existing, entry];
+    setMedForm(prev => ({ ...prev, illnesses: updated }));
+    setShowIllnessForm(false);
+  };
+
+  const deleteIllness = (id: string) => {
+    setMedForm(prev => ({ ...prev, illnesses: (prev.illnesses ?? []).filter(i => i.id !== id) }));
+  };
 
   const medPanResponder = useRef(
     PanResponder.create({
@@ -87,6 +120,9 @@ export default function PetProfileScreen() {
 
   const openMedicalModal = () => {
     setMedForm(pet?.medicalProfile ?? {});
+    setShowIllnessForm(false);
+    setIllnessForm({});
+    setEditingIllnessId(null);
     setShowMedicalModal(true);
   };
 
@@ -128,7 +164,7 @@ export default function PetProfileScreen() {
     ? [...pet.weightHistory].sort((a, b) => b.date.localeCompare(a.date))[0]
     : null;
   const med = pet.medicalProfile;
-  const hasMedical = med && (med.allergies || med.chronicConditions || med.vetName || med.vetPhone);
+  const hasMedical = med && (med.allergies || med.chronicConditions || med.vetName || med.vetPhone || med.bloodType || (med.illnesses && med.illnesses.length > 0));
 
   return (
     <>
@@ -214,8 +250,52 @@ export default function PetProfileScreen() {
                   </View>
                 </>
               ) : null}
+              {pet.length ? (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.infoRow}>
+                    <MaterialCommunityIcons name="ruler" size={18} color={Colors.primary} />
+                    <Text style={styles.infoLabel}>{language === "uk" ? "Довжина" : "Length"}</Text>
+                    <Text style={styles.infoValue}>{pet.length} см</Text>
+                  </View>
+                </>
+              ) : null}
+              {pet.height ? (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.infoRow}>
+                    <MaterialCommunityIcons name="human-male-height" size={18} color={Colors.primary} />
+                    <Text style={styles.infoLabel}>{language === "uk" ? "Висота" : "Height"}</Text>
+                    <Text style={styles.infoValue}>{pet.height} см</Text>
+                  </View>
+                </>
+              ) : null}
             </View>
           </Animated.View>
+
+          {/* Personality & Description */}
+          {(pet.personality || pet.description) ? (
+            <Animated.View entering={FadeInDown.delay(100)}>
+              <View style={styles.infoCard}>
+                <Text style={styles.cardSectionTitle}>{language === "uk" ? "Характер та опис" : "Personality & Description"}</Text>
+                {pet.personality ? (
+                  <View style={styles.infoRow}>
+                    <MaterialCommunityIcons name="heart-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.infoLabel}>{language === "uk" ? "Характер" : "Personality"}</Text>
+                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{pet.personality}</Text>
+                  </View>
+                ) : null}
+                {pet.personality && pet.description ? <View style={styles.divider} /> : null}
+                {pet.description ? (
+                  <View style={styles.infoRow}>
+                    <MaterialCommunityIcons name="text-outline" size={18} color={Colors.primary} />
+                    <Text style={styles.infoLabel}>{language === "uk" ? "Опис" : "Description"}</Text>
+                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{pet.description}</Text>
+                  </View>
+                ) : null}
+              </View>
+            </Animated.View>
+          ) : null}
 
           {/* Medical profile */}
           <Animated.View entering={FadeInDown.delay(120)}>
@@ -245,9 +325,33 @@ export default function PetProfileScreen() {
                     </View>
                   </>
                 ) : null}
-                {med?.vetName ? (
+                {med?.bloodType ? (
                   <>
                     {(med?.allergies || med?.chronicConditions) && <View style={styles.divider} />}
+                    <View style={styles.infoRow}>
+                      <MaterialCommunityIcons name="water-outline" size={18} color={Colors.primary} />
+                      <Text style={styles.infoLabel}>{language === "uk" ? "Група крові" : "Blood Type"}</Text>
+                      <Text style={styles.infoValue}>{med.bloodType}</Text>
+                    </View>
+                  </>
+                ) : null}
+                {med?.illnesses && med.illnesses.length > 0 ? (
+                  <>
+                    {(med?.allergies || med?.chronicConditions || med?.bloodType) && <View style={styles.divider} />}
+                    <View style={{ gap: 6 }}>
+                      <Text style={[styles.infoLabel, { marginBottom: 2 }]}>{language === "uk" ? "Хвороби" : "Illnesses"}</Text>
+                      {med.illnesses.map((ill) => (
+                        <View key={ill.id} style={styles.illnessBadge}>
+                          <Text style={styles.illnessName}>{ill.name}</Text>
+                          {ill.startDate ? <Text style={styles.illnessDates}>{formatDateShort(ill.startDate)}{ill.endDate ? ` – ${formatDateShort(ill.endDate)}` : ""}</Text> : null}
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+                {med?.vetName ? (
+                  <>
+                    {(med?.allergies || med?.chronicConditions || med?.bloodType || (med?.illnesses && med.illnesses.length > 0)) && <View style={styles.divider} />}
                     <View style={styles.infoRow}>
                       <MaterialCommunityIcons name="account-outline" size={18} color={Colors.primary} />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Ветеринар" : "Vet"}</Text>
@@ -257,7 +361,7 @@ export default function PetProfileScreen() {
                 ) : null}
                 {med?.vetPhone ? (
                   <>
-                    {(med?.allergies || med?.chronicConditions || med?.vetName) && <View style={styles.divider} />}
+                    {(med?.allergies || med?.chronicConditions || med?.bloodType || (med?.illnesses && med.illnesses.length > 0) || med?.vetName) && <View style={styles.divider} />}
                     <View style={styles.infoRow}>
                       <MaterialCommunityIcons name="phone-outline" size={18} color={Colors.accentGreen} />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Телефон ветеринара" : "Vet Phone"}</Text>
@@ -382,6 +486,98 @@ export default function PetProfileScreen() {
                   multiline
                 />
 
+                {/* Blood Type */}
+                <Text style={styles.medLabel}>{language === "uk" ? "Група крові" : "Blood Type"}</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: "row", gap: 8, paddingVertical: 4 }}>
+                    {BLOOD_TYPES.map((bt) => (
+                      <Pressable
+                        key={bt}
+                        onPress={() => setMedForm(prev => ({ ...prev, bloodType: prev.bloodType === bt ? undefined : bt }))}
+                        style={[styles.bloodTypeChip, medForm.bloodType === bt && styles.bloodTypeChipActive]}
+                      >
+                        <Text style={[styles.bloodTypeText, medForm.bloodType === bt && styles.bloodTypeTextActive]}>{bt}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                {/* Illnesses */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <Text style={styles.medLabel}>{language === "uk" ? "Хвороби" : "Illnesses"}</Text>
+                  <Pressable onPress={openIllnessAdd} style={styles.illnessAddBtn}>
+                    <MaterialCommunityIcons name="plus" size={16} color={Colors.primary} />
+                    <Text style={styles.illnessAddText}>{language === "uk" ? "Додати" : "Add"}</Text>
+                  </Pressable>
+                </View>
+                {(medForm.illnesses ?? []).map((ill) => (
+                  <View key={ill.id} style={styles.illnessRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.illnessRowName}>{ill.name}</Text>
+                      {ill.startDate ? <Text style={styles.illnessRowDates}>{formatDateShort(ill.startDate)}{ill.endDate ? ` – ${formatDateShort(ill.endDate)}` : " – ..."}</Text> : null}
+                      {ill.description ? <Text style={styles.illnessRowDesc}>{ill.description}</Text> : null}
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 12 }}>
+                      <Pressable onPress={() => openIllnessEdit(ill)} hitSlop={8}>
+                        <MaterialCommunityIcons name="pencil-outline" size={18} color={Colors.primary} />
+                      </Pressable>
+                      <Pressable onPress={() => deleteIllness(ill.id)} hitSlop={8}>
+                        <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.textTertiary} />
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+
+                {/* Inline illness form */}
+                {showIllnessForm && (
+                  <View style={styles.illnessFormBox}>
+                    <Text style={styles.medLabel}>{editingIllnessId ? (language === "uk" ? "Редагувати хворобу" : "Edit illness") : (language === "uk" ? "Нова хвороба" : "New illness")}</Text>
+                    <TextInput
+                      style={styles.medInput}
+                      value={illnessForm.name ?? ""}
+                      onChangeText={(v) => setIllnessForm(prev => ({ ...prev, name: v }))}
+                      placeholder={language === "uk" ? "Назва хвороби *" : "Illness name *"}
+                      placeholderTextColor={Colors.textTertiary}
+                    />
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <TextInput
+                          style={styles.medInput}
+                          value={illnessForm.startDate ?? ""}
+                          onChangeText={(v) => setIllnessForm(prev => ({ ...prev, startDate: v }))}
+                          placeholder={language === "uk" ? "Початок (рр-мм-дд)" : "Start (yy-mm-dd)"}
+                          placeholderTextColor={Colors.textTertiary}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <TextInput
+                          style={styles.medInput}
+                          value={illnessForm.endDate ?? ""}
+                          onChangeText={(v) => setIllnessForm(prev => ({ ...prev, endDate: v }))}
+                          placeholder={language === "uk" ? "Кінець (необов.)" : "End (optional)"}
+                          placeholderTextColor={Colors.textTertiary}
+                        />
+                      </View>
+                    </View>
+                    <TextInput
+                      style={styles.medInput}
+                      value={illnessForm.description ?? ""}
+                      onChangeText={(v) => setIllnessForm(prev => ({ ...prev, description: v }))}
+                      placeholder={language === "uk" ? "Опис (необов.)" : "Description (optional)"}
+                      placeholderTextColor={Colors.textTertiary}
+                      multiline
+                    />
+                    <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                      <Pressable onPress={() => setShowIllnessForm(false)} style={[styles.illnessFormBtn, { backgroundColor: Colors.border }]}>
+                        <Text style={{ color: Colors.text, fontFamily: "Inter_500Medium", fontSize: 14 }}>{language === "uk" ? "Скасувати" : "Cancel"}</Text>
+                      </Pressable>
+                      <Pressable onPress={saveIllness} style={[styles.illnessFormBtn, { backgroundColor: Colors.primary }]}>
+                        <Text style={{ color: Colors.textLight, fontFamily: "Inter_600SemiBold", fontSize: 14 }}>{language === "uk" ? "Зберегти" : "Save"}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                )}
+
                 <Text style={styles.medLabel}>{language === "uk" ? "Ім'я ветеринара" : "Vet Name"}</Text>
                 <TextInput
                   style={styles.medInput}
@@ -495,4 +691,35 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text,
     minHeight: 44,
   },
+  cardSectionTitle: {
+    fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,
+    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12,
+  },
+  illnessBadge: {
+    backgroundColor: Colors.primaryLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
+    flexDirection: "row", alignItems: "center", justifyContent: "space-between",
+  },
+  illnessName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.primary },
+  illnessDates: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
+  bloodTypeChip: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.background,
+  },
+  bloodTypeChipActive: { backgroundColor: Colors.primary, borderColor: Colors.primary },
+  bloodTypeText: { fontSize: 13, fontFamily: "Inter_500Medium", color: Colors.text },
+  bloodTypeTextActive: { color: Colors.textLight },
+  illnessAddBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
+  illnessAddText: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.primary },
+  illnessRow: {
+    flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
+    backgroundColor: Colors.primaryLight, borderRadius: 12, padding: 12, marginBottom: 8,
+  },
+  illnessRowName: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  illnessRowDates: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
+  illnessRowDesc: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2, fontStyle: "italic" },
+  illnessFormBox: {
+    backgroundColor: Colors.background, borderRadius: 14, borderWidth: 1, borderColor: Colors.border,
+    padding: 12, marginBottom: 8, gap: 8,
+  },
+  illnessFormBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
 });

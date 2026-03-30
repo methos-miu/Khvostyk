@@ -102,12 +102,15 @@ function WeightChart({ entries }: { entries: WeightEntry[] }) {
 
 export default function WeightScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPet, addWeightEntry, deleteWeightEntry } = usePets();
+  const { getPet, addWeightEntry, updateWeightEntry, deleteWeightEntry } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const [showPicker, setShowPicker] = useState(false);
   const [selectedWeight, setSelectedWeight] = useState("5.0");
+  const [showEditPicker, setShowEditPicker] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<import("@/context/PetsContext").WeightEntry | null>(null);
+  const [editPickerWeight, setEditPickerWeight] = useState("5.0");
 
   const pet = getPet(id);
 
@@ -154,6 +157,36 @@ export default function WeightScreen() {
     await addWeightEntry(pet.id, { date: iso, weight: parseFloat(selectedWeight) });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setShowPicker(false);
+  };
+
+  const editPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 2,
+      onPanResponderRelease: (_, gs) => { if (gs.dy > 50) setShowEditPicker(false); },
+    })
+  ).current;
+
+  const onEditPickerScrollEnd = (event: any) => {
+    const index = Math.max(0, Math.min(Math.round(event.nativeEvent.contentOffset.y / ITEM_HEIGHT), WEIGHT_VALUES.length - 1));
+    const v = WEIGHT_VALUES[index];
+    if (v !== editPickerWeight) { Haptics.selectionAsync(); setEditPickerWeight(v); }
+  };
+
+  const handleEditOpen = (entry: WeightEntry) => {
+    const initW = WEIGHT_VALUES.includes(entry.weight.toFixed(1)) ? entry.weight.toFixed(1) : "5.0";
+    setEditPickerWeight(initW);
+    setEditingEntry(entry);
+    setShowEditPicker(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const handleEditSave = async () => {
+    if (!pet || !editingEntry) return;
+    await updateWeightEntry(pet.id, editingEntry.id, parseFloat(editPickerWeight));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setShowEditPicker(false);
+    setEditingEntry(null);
   };
 
   const handleDelete = (entry: WeightEntry) => {
@@ -241,6 +274,9 @@ export default function WeightScreen() {
                     </Text>
                   </View>
                 )}
+                <Pressable onPress={() => handleEditOpen(entry)} hitSlop={8} style={{ marginRight: 10 }}>
+                  <MaterialCommunityIcons name="pencil-outline" size={18} color={Colors.primary} />
+                </Pressable>
                 <Pressable onPress={() => handleDelete(entry)} hitSlop={8}>
                   <MaterialCommunityIcons name="trash-can-outline" size={18} color={Colors.textTertiary} />
                 </Pressable>
@@ -286,6 +322,54 @@ export default function WeightScreen() {
                     style={styles.pickerItem}
                   >
                     <Text style={[styles.pickerItemText, selectedWeight === item && styles.pickerItemActive]}>
+                      {item} кг
+                    </Text>
+                  </Pressable>
+                )}
+              />
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Edit weight picker modal */}
+      <Modal visible={showEditPicker} transparent animationType="slide" onRequestClose={() => setShowEditPicker(false)}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowEditPicker(false)} />
+          <Animated.View entering={FadeInDown.springify()} style={[styles.modalSheet, { paddingBottom: insets.bottom + 12 }]}>
+            <View {...editPanResponder.panHandlers} style={styles.handleWrap}>
+              <View style={styles.modalHandle} />
+            </View>
+            <View style={styles.modalHeader}>
+              <Pressable onPress={() => setShowEditPicker(false)}>
+                <Text style={styles.modalCancel}>{t.cancel}</Text>
+              </Pressable>
+              <Text style={styles.modalTitle}>
+                {editingEntry ? (language === "uk" ? `Редагувати ${editingEntry.date}` : `Edit ${editingEntry.date}`) : ""}
+              </Text>
+              <Pressable onPress={handleEditSave}>
+                <Text style={styles.modalSave}>{language === "uk" ? "Зберегти" : "Save"}</Text>
+              </Pressable>
+            </View>
+            <View style={styles.pickerWrap}>
+              <View style={styles.pickerSelectionBar} />
+              <FlatList
+                data={WEIGHT_VALUES}
+                keyExtractor={(item) => item}
+                showsVerticalScrollIndicator={false}
+                snapToInterval={ITEM_HEIGHT}
+                decelerationRate="fast"
+                contentContainerStyle={{ paddingVertical: ITEM_HEIGHT * 2 }}
+                initialScrollIndex={Math.max(0, WEIGHT_VALUES.indexOf(editPickerWeight))}
+                getItemLayout={(_, index) => ({ length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index })}
+                onScrollEndDrag={onEditPickerScrollEnd}
+                onMomentumScrollEnd={onEditPickerScrollEnd}
+                renderItem={({ item }) => (
+                  <Pressable
+                    onPress={() => { Haptics.selectionAsync(); setEditPickerWeight(item); }}
+                    style={styles.pickerItem}
+                  >
+                    <Text style={[styles.pickerItemText, editPickerWeight === item && styles.pickerItemActive]}>
                       {item} кг
                     </Text>
                   </Pressable>
