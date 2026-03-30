@@ -330,9 +330,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       setPets(updated);
       await savePets(updated);
 
-      getCurrentUserId().then(uid => {
-        if (!uid) return;
-        supabase.from("pets").insert({
+      const uid = await getCurrentUserId();
+      if (uid) {
+        const { error: petError } = await supabase.from("pets").insert({
           id: newPet.id, owner_id: uid, name: newPet.name,
           species: newPet.species, custom_species: newPet.customSpecies ?? null,
           breed: newPet.breed, birthdate: newPet.birthdate, weight: newPet.weight,
@@ -344,14 +344,16 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           personality: newPet.personality ?? null,
           description: newPet.description ?? null,
           created_at: newPet.createdAt,
-        }).then(({ error }) => { if (error) console.warn("Supabase addPet:", error.message); });
+        });
+        if (petError) console.warn("Supabase addPet:", petError.message);
         if (initWeightEntry) {
-          supabase.from("weight_entries").insert({
+          const { error: weightError } = await supabase.from("weight_entries").insert({
             id: initWeightEntry.id, pet_id: newPet.id,
             date: initWeightEntry.date, weight: initWeightEntry.weight,
-          }).then(({ error }) => { if (error) console.warn("Supabase addWeightEntry (init):", error.message); });
+          });
+          if (weightError) console.warn("Supabase addWeightEntry (init):", weightError.message);
         }
-      });
+      }
       return newPet;
     },
     [pets]
