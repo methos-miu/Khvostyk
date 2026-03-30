@@ -232,7 +232,7 @@ export default function PetProfileScreen() {
                   <View style={styles.infoRow}>
                     <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FF6B6B" />
                     <Text style={styles.infoLabel}>{language === "uk" ? "Алергії" : "Allergies"}</Text>
-                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]} numberOfLines={2}>{med.allergies}</Text>
+                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{med.allergies}</Text>
                   </View>
                 ) : null}
                 {med?.chronicConditions ? (
@@ -241,7 +241,7 @@ export default function PetProfileScreen() {
                     <View style={styles.infoRow}>
                       <MaterialCommunityIcons name="heart-pulse" size={18} color="#FF9500" />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Хроніч. хвороби" : "Chronic Conditions"}</Text>
-                      <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]} numberOfLines={2}>{med.chronicConditions}</Text>
+                      <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{med.chronicConditions}</Text>
                     </View>
                   </>
                 ) : null}
