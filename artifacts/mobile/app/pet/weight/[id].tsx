@@ -150,8 +150,8 @@ export default function WeightScreen() {
     navigation.setOptions({
       title: language === "uk" ? `Вага • ${pet?.name}` : `Weight • ${pet?.name}`,
       headerRight: () => (
-        <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPicker(true); }} style={{ marginRight: -8 }}>
-          <MaterialCommunityIcons name="plus" size={26} color={Colors.primary} />
+        <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPicker(true); }} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(0,0,0,0.06)", alignItems: "center", justifyContent: "center", marginRight: 8 }}>
+          <MaterialCommunityIcons name="plus" size={22} color={Colors.primary} />
         </Pressable>
       ),
     });
