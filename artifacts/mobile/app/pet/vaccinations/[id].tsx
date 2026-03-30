@@ -42,7 +42,7 @@ export default function VaccinationsScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.push({ pathname: "/pet/add-vaccination/[id]", params: { id } });
           }}
-          style={{ marginRight: 16 }}
+          style={{ padding: 8 }}
         >
           <MaterialCommunityIcons name="plus" size={26} color={Colors.primary} />
         </Pressable>
