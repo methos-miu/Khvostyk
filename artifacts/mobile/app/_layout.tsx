@@ -121,7 +121,7 @@ function RootLayoutNav() {
             color: Colors.text,
           },
           contentStyle: { backgroundColor: Colors.background },
-          headerRightContainerStyle: { paddingRight: 0, marginRight: 0 },
+          headerRightContainerStyle: { minWidth: 44, alignItems: "center", justifyContent: "center", paddingRight: 8 },
         }}
       >
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
