@@ -91,7 +91,7 @@ function getBreedList(species: Species, lang: "uk" | "en"): string[] {
 
 export default function EditPetScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPet, updatePet, addWeightEntry } = usePets();
+  const { getPet, updatePet, addWeightEntry, updateWeightEntry } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -316,8 +316,13 @@ export default function EditPetScreen() {
       });
       if (form.weight.trim()) {
         const today = new Date();
-        const todayIso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-        await addWeightEntry(pet.id, { date: todayIso, weight: parseFloat(form.weight.trim()) });
+        const todayIso = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+        const existingEntry = (pet.weightHistory ?? []).find(e => e.date === todayIso);
+        if (existingEntry) {
+          await updateWeightEntry(pet.id, existingEntry.id, parseFloat(form.weight.trim()));
+        } else {
+          await addWeightEntry(pet.id, { date: todayIso, weight: parseFloat(form.weight.trim()) });
+        }
       }
       router.back();
     } finally {
