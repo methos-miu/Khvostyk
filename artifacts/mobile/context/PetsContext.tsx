@@ -329,9 +329,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           name: updates.name, species: updates.species,
           custom_species: updates.customSpecies ?? null,
           breed: updates.breed, birthdate: updates.birthdate, weight: updates.weight,
-          gender: updates.gender, color: updates.color ?? null,
+          gender: updates.gender, color: updates.color !== undefined ? updates.color : null,
           photo_url: extractStoragePath(updates.photoUri) ?? null,
-          medical_profile: updates.medicalProfile ?? null,
+          medical_profile: updates.medicalProfile !== undefined ? updates.medicalProfile : null,
           updated_at: new Date().toISOString(),
         }).eq("id", id).then(({ error }) => { if (error) console.warn("Supabase updatePet:", error.message); });
       });
