@@ -177,7 +177,7 @@ export default function AddPetScreen() {
         if (uid) {
           const ext = form.photoUri.split(".").pop() ?? "jpg";
           const fileName = `${uid}/${Date.now()}.${ext}`;
-          const base64 = await FileSystem.readAsStringAsync(form.photoUri, { encoding: FileSystem.EncodingType.Base64 });
+          const base64 = await FileSystem.readAsStringAsync(form.photoUri, { encoding: "base64" });
           const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
           const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, binary, { contentType: "image/jpeg" });
           if (!error && data) {
