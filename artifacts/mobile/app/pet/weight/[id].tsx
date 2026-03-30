@@ -37,10 +37,22 @@ function formatFullDate(iso: string, lang: "uk" | "en"): string {
   return d.toLocaleDateString(lang === "uk" ? "uk-UA" : "en-GB", { day: "numeric", month: "long", year: "numeric" });
 }
 
-function WeightChart({ entries }: { entries: WeightEntry[] }) {
-  if (entries.length < 2) return null;
+function WeightChart({ entries, language }: { entries: WeightEntry[]; language: "uk" | "en" }) {
   const WIDTH = 320;
   const HEIGHT = 160;
+  if (entries.length < 2) {
+    return (
+      <View style={{
+        width: WIDTH, height: HEIGHT,
+        borderWidth: 1, borderColor: Colors.border, borderRadius: 8,
+        alignItems: "center", justifyContent: "center",
+      }}>
+        <Text style={{ fontSize: 13, color: Colors.textSecondary, textAlign: "center", paddingHorizontal: 16 }}>
+          {language === "uk" ? "Недостатньо записів для побудови графіка" : "Not enough entries to build a chart"}
+        </Text>
+      </View>
+    );
+  }
   const PADDING = { top: 20, right: 20, bottom: 30, left: 40 };
 
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date));
@@ -200,6 +212,24 @@ export default function WeightScreen() {
     );
   };
 
+  const handleAddOrPrompt = () => {
+    const today = new Date();
+    const todayIso = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
+    const todayEntry = sorted.find(e => e.date === todayIso);
+    if (todayEntry) {
+      Alert.alert(
+        language === "uk" ? "Сьогоднішнє значення ваги вже додане" : "Today's weight already added",
+        undefined,
+        [
+          { text: language === "uk" ? "Скасувати" : "Cancel", style: "cancel" },
+          { text: language === "uk" ? "Редагувати" : "Edit", onPress: () => handleEditOpen(todayEntry) },
+        ]
+      );
+    } else {
+      setShowPicker(true);
+    }
+  };
+
   if (!pet) return null;
 
   const weightIndex = WEIGHT_VALUES.indexOf(selectedWeight);
@@ -207,32 +237,35 @@ export default function WeightScreen() {
   return (
     <>
       <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}>
-        {sorted.length >= 2 && (
-          <Animated.View entering={FadeInDown.delay(60)} style={styles.chartCard}>
-            <Text style={styles.chartTitle}>
-              {language === "uk" ? "Графік ваги" : "Weight Chart"}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <WeightChart entries={pet.weightHistory ?? []} />
-            </ScrollView>
-            {sorted.length >= 2 && (
-              <View style={styles.chartStats}>
-                <View style={styles.chartStat}>
-                  <Text style={styles.chartStatVal}>{sorted[0].weight.toFixed(1)} кг</Text>
-                  <Text style={styles.chartStatLabel}>{language === "uk" ? "Поточна" : "Current"}</Text>
-                </View>
-                <View style={styles.chartStat}>
-                  <Text style={styles.chartStatVal}>{Math.min(...(pet.weightHistory ?? []).map(e => e.weight)).toFixed(1)} кг</Text>
-                  <Text style={styles.chartStatLabel}>{language === "uk" ? "Мін." : "Min"}</Text>
-                </View>
-                <View style={styles.chartStat}>
-                  <Text style={styles.chartStatVal}>{Math.max(...(pet.weightHistory ?? []).map(e => e.weight)).toFixed(1)} кг</Text>
-                  <Text style={styles.chartStatLabel}>{language === "uk" ? "Макс." : "Max"}</Text>
-                </View>
+        <Animated.View entering={FadeInDown.delay(60)} style={styles.chartCard}>
+          <Text style={styles.chartTitle}>
+            {language === "uk" ? "Графік ваги" : "Weight Chart"}
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <WeightChart entries={pet.weightHistory ?? []} language={language} />
+          </ScrollView>
+          {sorted.length >= 2 && (
+            <View style={styles.chartStats}>
+              <View style={styles.chartStat}>
+                <Text style={styles.chartStatVal}>{sorted[0].weight.toFixed(1)} кг</Text>
+                <Text style={styles.chartStatLabel}>{language === "uk" ? "Поточна" : "Current"}</Text>
               </View>
-            )}
-          </Animated.View>
-        )}
+              <View style={styles.chartStat}>
+                <Text style={styles.chartStatVal}>{Math.min(...(pet.weightHistory ?? []).map(e => e.weight)).toFixed(1)} кг</Text>
+                <Text style={styles.chartStatLabel}>{language === "uk" ? "Мін." : "Min"}</Text>
+              </View>
+              <View style={styles.chartStat}>
+                <Text style={styles.chartStatVal}>{Math.max(...(pet.weightHistory ?? []).map(e => e.weight)).toFixed(1)} кг</Text>
+                <Text style={styles.chartStatLabel}>{language === "uk" ? "Макс." : "Max"}</Text>
+              </View>
+            </View>
+          )}
+        </Animated.View>
+
+        <Pressable onPress={handleAddOrPrompt} style={[styles.addBtn, { marginBottom: 16 }]}>
+          <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
+          <Text style={styles.addBtnText}>{language === "uk" ? "Додати вагу" : "Add weight"}</Text>
+        </Pressable>
 
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>{language === "uk" ? "Журнал ваги" : "Weight Log"}</Text>
@@ -407,7 +440,7 @@ const styles = StyleSheet.create({
   emptySubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, textAlign: "center", lineHeight: 20, marginBottom: 24 },
   addBtn: {
     backgroundColor: Colors.primary, paddingHorizontal: 24, paddingVertical: 14,
-    borderRadius: 14, flexDirection: "row", alignItems: "center", gap: 8,
+    borderRadius: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
   },
   addBtnText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.textLight },
   entryCard: {
