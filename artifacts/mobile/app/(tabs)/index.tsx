@@ -36,6 +36,9 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
   const { t, language } = useLanguage();
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const age = calculateAge(pet.birthdate, language);
+  const displayWeight = pet.weightHistory && pet.weightHistory.length > 0
+    ? [...pet.weightHistory].sort((a, b) => b.date.localeCompare(a.date))[0].weight.toFixed(1)
+    : pet.weight;
 
   return (
     <Animated.View entering={FadeInDown.delay(index * 80).springify().damping(14)}>
@@ -87,9 +90,9 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
               <MaterialCommunityIcons name="clock-outline" size={11} color={Colors.primary} />
               <Text style={styles.agePillText}>{age}</Text>
             </View>
-            {pet.weight ? (
+            {displayWeight ? (
               <View style={styles.weightPill}>
-                <Text style={styles.weightPillText}>{pet.weight} кг</Text>
+                <Text style={styles.weightPillText}>{displayWeight} кг</Text>
               </View>
             ) : null}
           </View>
