@@ -117,13 +117,17 @@ export default function EditPetScreen() {
     return pet.customSpecies ?? "";
   };
 
+  const latestWeight = pet?.weightHistory && pet.weightHistory.length > 0
+    ? [...pet.weightHistory].sort((a, b) => b.date.localeCompare(a.date))[0].weight.toFixed(1)
+    : pet?.weight ?? "";
+
   const [form, setForm] = useState<FormData>({
     name: pet?.name ?? "",
     species: initSpecies(),
     customSpecies: initCustomSpecies(),
     breed: pet?.breed ?? "",
     birthdate: pet?.birthdate ?? "",
-    weight: pet?.weight ?? "",
+    weight: latestWeight,
     length: pet?.length != null ? String(pet.length) : "",
     height: pet?.height != null ? String(pet.height) : "",
     color: pet?.color ?? "",
