@@ -22,6 +22,7 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import * as FileSystem from "expo-file-system";
 import { supabase } from "@/lib/supabase";
 import { Colors } from "@/constants/colors";
 import {
@@ -216,9 +217,9 @@ export default function EditPetScreen() {
         if (uid) {
           const ext = form.photoUri.split(".").pop() ?? "jpg";
           const fileName = `${uid}/${Date.now()}.${ext}`;
-          const response = await fetch(form.photoUri);
-          const blob = await response.blob();
-          const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, blob, { contentType: `image/${ext}` });
+          const base64 = await FileSystem.readAsStringAsync(form.photoUri, { encoding: FileSystem.EncodingType.Base64 });
+          const binary = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+          const { data, error } = await supabase.storage.from("pet-photos").upload(fileName, binary, { contentType: "image/jpeg" });
           if (!error && data) {
             photoUrl = data.path;
           }
