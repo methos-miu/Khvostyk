@@ -23,7 +23,7 @@ import {
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { supabase } from "@/lib/supabase";
 import { Colors } from "@/constants/colors";
 import {
