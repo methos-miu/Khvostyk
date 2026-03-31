@@ -39,6 +39,7 @@ export default function PetProfileScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const scrollViewHeight = useRef(0);
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
   const [showIllnessForm, setShowIllnessForm] = useState(false);
@@ -180,6 +181,8 @@ export default function PetProfileScreen() {
         showsVerticalScrollIndicator={false}
         onContentSizeChange={(_, h) => setShowScrollTop(h > scrollViewHeight.current)}
         onLayout={(e) => { scrollViewHeight.current = e.nativeEvent.layout.height; }}
+        onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={16}
       >
         <Animated.View entering={FadeIn}>
           <LinearGradient colors={[Colors.gradientStart, Colors.gradientEnd]} style={styles.heroSection}>
@@ -444,7 +447,7 @@ export default function PetProfileScreen() {
         </View>
       </ScrollView>
 
-      {showScrollTop && (
+      {showScrollTop && scrollY > 100 && (
         <Pressable
           onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
           style={{
