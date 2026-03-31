@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
   },
   cardSectionTitle: {
     fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,
-    textTransform: "uppercase", letterSpacing: 0.6, padding: 14, paddingBottom: 8,
+    textTransform: "uppercase", letterSpacing: 0.6, padding: 14, paddingBottom: 8, paddingLeft: 16,
   },
   infoRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, paddingHorizontal: 14 },
   infoLabel: { flex: 0, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, minWidth: 80 },
