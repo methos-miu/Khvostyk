@@ -249,16 +249,16 @@ export default function WeightScreen() {
           {sorted.length >= 2 && (
             <View style={styles.chartStats}>
               <View style={styles.chartStat}>
-                <Text style={styles.chartStatVal}>{sorted[0].weight.toFixed(1)} кг</Text>
-                <Text style={styles.chartStatLabel}>{language === "uk" ? "Поточна" : "Current"}</Text>
-              </View>
-              <View style={styles.chartStat}>
                 <Text style={styles.chartStatVal}>{Math.min(...(pet.weightHistory ?? []).map(e => e.weight)).toFixed(1)} кг</Text>
                 <Text style={styles.chartStatLabel}>{language === "uk" ? "Мін." : "Min"}</Text>
               </View>
               <View style={styles.chartStat}>
                 <Text style={styles.chartStatVal}>{Math.max(...(pet.weightHistory ?? []).map(e => e.weight)).toFixed(1)} кг</Text>
                 <Text style={styles.chartStatLabel}>{language === "uk" ? "Макс." : "Max"}</Text>
+              </View>
+              <View style={styles.chartStat}>
+                <Text style={styles.chartStatVal}>{sorted[0].weight.toFixed(1)} кг</Text>
+                <Text style={styles.chartStatLabel}>{language === "uk" ? "Поточна" : "Current"}</Text>
               </View>
             </View>
           )}

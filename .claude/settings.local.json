@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /home/runner/workspace/artifacts/mobile -not -path */node_modules/* -type f)"
+    ]
+  }
+}

@@ -5,6 +5,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Platform,
   Pressable,
@@ -113,7 +114,8 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
 }
 
 export default function HomeScreen() {
-  const { pets } = usePets();
+  const { pets, isLoaded, isSyncing } = usePets();
+  const isLoading = !isLoaded || (isSyncing && pets.length === 0);
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
@@ -128,7 +130,9 @@ export default function HomeScreen() {
           <View style={styles.headerLeft}>
             <Text style={styles.headerTitle}>{t.appName}</Text>
             <Text style={styles.headerSubtitle}>
-              {pets.length === 0
+              {isLoading
+                ? "..."
+                : pets.length === 0
                 ? t.noPetsSubtitle
                 : pets.length === 1
                 ? t.onePet
@@ -149,7 +153,11 @@ export default function HomeScreen() {
         </Animated.View>
       </LinearGradient>
 
-      {pets.length === 0 ? (
+      {isLoading ? (
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : pets.length === 0 ? (
         <Animated.View entering={FadeInDown.delay(200)} style={styles.emptyContainer}>
           {/* Cute illustrated empty state */}
           <View style={styles.emptyIllustration}>

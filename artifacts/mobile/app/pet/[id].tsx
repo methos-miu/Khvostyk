@@ -309,7 +309,7 @@ export default function PetProfileScreen() {
                   <View style={styles.infoRow}>
                     <MaterialCommunityIcons name="heart-outline" size={18} color={Colors.primary} />
                     <Text style={styles.infoLabel}>{language === "uk" ? "Характер" : "Personality"}</Text>
-                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{pet.personality}</Text>
+                    <Text style={styles.infoValue}>{pet.personality}</Text>
                   </View>
                 ) : null}
                 {pet.personality && pet.description ? <View style={styles.divider} /> : null}
@@ -341,7 +341,7 @@ export default function PetProfileScreen() {
                   <View style={styles.infoRow}>
                     <MaterialCommunityIcons name="alert-circle-outline" size={18} color="#FF6B6B" />
                     <Text style={styles.infoLabel}>{language === "uk" ? "Алергії" : "Allergies"}</Text>
-                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{med.allergies}</Text>
+                    <Text style={styles.infoValue}>{med.allergies}</Text>
                   </View>
                 ) : null}
                 {med?.chronicConditions ? (
@@ -350,7 +350,7 @@ export default function PetProfileScreen() {
                     <View style={styles.infoRow}>
                       <MaterialCommunityIcons name="heart-pulse" size={18} color="#FF9500" />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Хроніч. хвороби" : "Chronic Conditions"}</Text>
-                      <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{med.chronicConditions}</Text>
+                      <Text style={styles.infoValue}>{med.chronicConditions}</Text>
                     </View>
                   </>
                 ) : null}
@@ -668,8 +668,8 @@ const styles = StyleSheet.create({
     textTransform: "uppercase", letterSpacing: 0.6, padding: 14, paddingBottom: 8, paddingLeft: 16,
   },
   infoRow: { flexDirection: "row", alignItems: "center", gap: 10, padding: 12, paddingHorizontal: 14 },
-  infoLabel: { flex: 0, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary, minWidth: 80 },
-  infoValue: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text },
+  infoLabel: { flex: 1, fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  infoValue: { flex: 1, fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.text, textAlign: "left" },
   divider: { height: 1, backgroundColor: Colors.border, marginLeft: 14 },
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: Colors.text },
