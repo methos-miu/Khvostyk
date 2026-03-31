@@ -288,7 +288,7 @@ export default function WeightScreen() {
                 : `Tap + to add the first weight entry for ${pet.name}`}
             </Text>
             <Pressable onPress={() => setShowPicker(true)} style={styles.addBtn}>
-              <MaterialCommunityIcons name="plus" size={20} color={Colors.textLight} />
+              <MaterialCommunityIcons name="plus-circle" size={20} color={Colors.textLight} />
               <Text style={styles.addBtnText}>{language === "uk" ? "Додати вагу" : "Add weight"}</Text>
             </Pressable>
           </Animated.View>
