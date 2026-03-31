@@ -150,10 +150,10 @@ function migratePet(raw: any): Pet {
     weightHistory: raw.weightHistory ?? [],
     reminders: raw.reminders ?? [],
     medicalProfile: raw.medicalProfile,
-    length: raw.length,
-    height: raw.height,
-    personality: raw.personality,
-    description: raw.description,
+    length: raw.length ?? undefined,
+    height: raw.height ?? undefined,
+    personality: raw.personality ?? undefined,
+    description: raw.description ?? undefined,
     createdAt: raw.createdAt ?? new Date().toISOString(),
   };
 }
@@ -293,8 +293,21 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         })
       );
 
-      setPets(petsWithPhotos);
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(petsWithPhotos));
+      const migratedPets = petsWithPhotos.map(pet => ({
+        ...pet,
+        vaccinations: pet.vaccinations ?? [],
+        documents: pet.documents ?? [],
+        weightHistory: pet.weightHistory ?? [],
+        reminders: pet.reminders ?? [],
+        length: pet.length ?? undefined,
+        height: pet.height ?? undefined,
+        personality: pet.personality ?? undefined,
+        description: pet.description ?? undefined,
+        medicalProfile: pet.medicalProfile ?? undefined,
+      }));
+
+      setPets(migratedPets);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(migratedPets));
     } catch (e) {
       console.warn("Supabase sync failed (offline?)", e);
     } finally {
