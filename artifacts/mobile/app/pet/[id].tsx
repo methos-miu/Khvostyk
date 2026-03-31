@@ -289,10 +289,12 @@ export default function PetProfileScreen() {
                 ) : null}
                 {pet.personality && pet.description ? <View style={styles.divider} /> : null}
                 {pet.description ? (
-                  <View style={styles.infoRow}>
-                    <MaterialCommunityIcons name="text-outline" size={18} color={Colors.primary} />
-                    <Text style={styles.infoLabel}>{language === "uk" ? "Опис" : "Description"}</Text>
-                    <Text style={[styles.infoValue, { flex: 1, textAlign: "right" }]}>{pet.description}</Text>
+                  <View style={{ padding: 12, paddingHorizontal: 14 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <MaterialCommunityIcons name="text-outline" size={18} color={Colors.primary} />
+                      <Text style={styles.infoLabel}>{language === "uk" ? "Опис" : "Description"}</Text>
+                    </View>
+                    <Text style={[styles.infoValue, { textAlign: "left" }]}>{pet.description}</Text>
                   </View>
                 ) : null}
               </View>
