@@ -693,10 +693,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.text,
     minHeight: 44,
   },
-  cardSectionTitle: {
-    fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,
-    textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 12,
-  },
   illnessBadge: {
     backgroundColor: Colors.primaryLight, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8,
     flexDirection: "row", alignItems: "center", justifyContent: "space-between",
