@@ -378,11 +378,11 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       setPets(updated);
       await savePets(updated);
 
-      getCurrentUserId().then(uid => {
+      getCurrentUserId().then(async uid => {
         if (!uid) return;
         const existing = pets.find(p => p.id === id);
         const merged = { ...existing, ...updates };
-        supabase.from("pets").update({
+        const { error } = await supabase.from("pets").update({
           name: merged.name,
           species: merged.species,
           custom_species: merged.customSpecies ?? null,
@@ -398,7 +398,24 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           personality: merged.personality ?? null,
           description: merged.description ?? null,
           updated_at: new Date().toISOString(),
-        }).eq("id", id).then(({ error }) => { if (error) console.warn("Supabase updatePet:", error.message); });
+        }).eq("id", id);
+        if (error) {
+          console.warn("Supabase updatePet (full):", error.message);
+          const { error: retryError } = await supabase.from("pets").update({
+            name: merged.name,
+            species: merged.species,
+            custom_species: merged.customSpecies ?? null,
+            breed: merged.breed,
+            birthdate: merged.birthdate,
+            weight: merged.weight,
+            gender: merged.gender ?? null,
+            color: merged.color ?? null,
+            photo_url: extractStoragePath(merged.photoUri) ?? null,
+            medical_profile: merged.medicalProfile ?? null,
+            updated_at: new Date().toISOString(),
+          }).eq("id", id);
+          if (retryError) console.warn("Supabase updatePet (base):", retryError.message);
+        }
       });
     },
     [pets]

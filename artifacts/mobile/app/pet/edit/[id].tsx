@@ -314,7 +314,8 @@ export default function EditPetScreen() {
         personality: form.personality.trim() || undefined,
         description: form.description.trim() || undefined,
       });
-      if (form.weight.trim()) {
+      const weightChanged = form.weight.trim() && form.weight.trim() !== latestWeight;
+      if (weightChanged) {
         const today = new Date();
         const todayIso = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
         const existingEntry = (pet.weightHistory ?? []).find(e => e.date === todayIso);
