@@ -36,6 +36,9 @@ export default function PetProfileScreen() {
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
 
+  const scrollRef = useRef<ScrollView>(null);
+  const scrollViewHeight = useRef(0);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
   const [showIllnessForm, setShowIllnessForm] = useState(false);
@@ -171,9 +174,12 @@ export default function PetProfileScreen() {
   return (
     <>
       <ScrollView
+        ref={scrollRef}
         style={styles.container}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
+        onContentSizeChange={(_, h) => setShowScrollTop(h > scrollViewHeight.current)}
+        onLayout={(e) => { scrollViewHeight.current = e.nativeEvent.layout.height; }}
       >
         <Animated.View entering={FadeIn}>
           <LinearGradient colors={[Colors.gradientStart, Colors.gradientEnd]} style={styles.heroSection}>
@@ -191,34 +197,34 @@ export default function PetProfileScreen() {
               <Text style={styles.heroBreed}>
                 {speciesLabel}{pet.breed ? ` • ${pet.breed}` : ""}
               </Text>
-
-              <View style={styles.heroStats}>
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{age}</Text>
-                  <Text style={styles.heroStatLabel}>{t.age}</Text>
-                </View>
-                {(latestWeight ?? (pet.weight ? { weight: parseFloat(pet.weight) } : null)) ? (
-                  <>
-                    <View style={styles.heroStatDivider} />
-                    <View style={styles.heroStat}>
-                      <Text style={styles.heroStatValue}>{latestWeight ? latestWeight.weight.toFixed(1) : pet.weight} кг</Text>
-                      <Text style={styles.heroStatLabel}>{t.weight.replace(" (кг)", "")}</Text>
-                    </View>
-                  </>
-                ) : null}
-                <View style={styles.heroStatDivider} />
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{pet.vaccinations.length}</Text>
-                  <Text style={styles.heroStatLabel}>{language === "uk" ? "Вакцин" : "Vacc."}</Text>
-                </View>
-                <View style={styles.heroStatDivider} />
-                <View style={styles.heroStat}>
-                  <Text style={styles.heroStatValue}>{pet.documents.length}</Text>
-                  <Text style={styles.heroStatLabel}>{language === "uk" ? "Докум." : "Docs"}</Text>
-                </View>
-              </View>
             </View>
           </LinearGradient>
+        </Animated.View>
+
+        <Animated.View entering={FadeInDown.delay(40)}>
+          <View style={[styles.quickActions, { marginHorizontal: 16, marginTop: 16 }]}>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/vaccinations/[id]", params: { id: pet.id } }); }}
+              style={[styles.actionButton, { backgroundColor: Colors.primaryLight }]}
+            >
+              <MaterialCommunityIcons name="medical-bag" size={24} color={Colors.primary} />
+              <Text style={[styles.actionLabel, { color: Colors.primary }]}>{t.vaccinations}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/documents/[id]", params: { id: pet.id } }); }}
+              style={[styles.actionButton, { backgroundColor: "#FFF0F0" }]}
+            >
+              <MaterialCommunityIcons name="file-document-outline" size={24} color={Colors.accent} />
+              <Text style={[styles.actionLabel, { color: Colors.accent }]}>{t.documents}</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/weight/[id]", params: { id: pet.id } }); }}
+              style={[styles.actionButton, { backgroundColor: "#F0FFF5" }]}
+            >
+              <MaterialCommunityIcons name="chart-line" size={24} color={Colors.accentGreen} />
+              <Text style={[styles.actionLabel, { color: Colors.accentGreen }]}>{language === "uk" ? "Вага" : "Weight"}</Text>
+            </Pressable>
+          </View>
         </Animated.View>
 
         <View style={styles.body}>
@@ -229,6 +235,12 @@ export default function PetProfileScreen() {
                 <MaterialCommunityIcons name="calendar-outline" size={18} color={Colors.primary} />
                 <Text style={styles.infoLabel}>{t.birthdate}</Text>
                 <Text style={styles.infoValue}>{formatDate(pet.birthdate)}</Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.infoRow}>
+                <MaterialCommunityIcons name="clock-outline" size={18} color={Colors.primary} />
+                <Text style={styles.infoLabel}>{t.age}</Text>
+                <Text style={styles.infoValue}>{age}</Text>
               </View>
               {pet.color ? (
                 <>
@@ -249,6 +261,16 @@ export default function PetProfileScreen() {
                     </Text>
                     <Text style={styles.infoLabel}>{t.gender}</Text>
                     <Text style={styles.infoValue}>{pet.gender === "male" ? t.male : t.female}</Text>
+                  </View>
+                </>
+              ) : null}
+              {(latestWeight || pet.weight) ? (
+                <>
+                  <View style={styles.divider} />
+                  <View style={styles.infoRow}>
+                    <MaterialCommunityIcons name="scale-bathroom" size={18} color={Colors.primary} />
+                    <Text style={styles.infoLabel}>{language === "uk" ? "Вага" : "Weight"}</Text>
+                    <Text style={styles.infoValue}>{latestWeight ? latestWeight.weight.toFixed(1) : pet.weight} кг</Text>
                   </View>
                 </>
               ) : null}
@@ -419,36 +441,32 @@ export default function PetProfileScreen() {
             )}
           </Animated.View>
 
-          {/* Quick actions */}
-          <Animated.View entering={FadeInDown.delay(200)}>
-            <View style={styles.quickActions}>
-              <Pressable
-                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/vaccinations/[id]", params: { id: pet.id } }); }}
-                style={[styles.actionButton, { backgroundColor: Colors.primaryLight }]}
-              >
-                <MaterialCommunityIcons name="medical-bag" size={24} color={Colors.primary} />
-                <Text style={[styles.actionLabel, { color: Colors.primary }]}>{t.vaccinations}</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/documents/[id]", params: { id: pet.id } }); }}
-                style={[styles.actionButton, { backgroundColor: "#FFF0F0" }]}
-              >
-                <MaterialCommunityIcons name="file-document-outline" size={24} color={Colors.accent} />
-                <Text style={[styles.actionLabel, { color: Colors.accent }]}>{t.documents}</Text>
-              </Pressable>
-
-              <Pressable
-                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/weight/[id]", params: { id: pet.id } }); }}
-                style={[styles.actionButton, { backgroundColor: "#F0FFF5" }]}
-              >
-                <MaterialCommunityIcons name="chart-line" size={24} color={Colors.accentGreen} />
-                <Text style={[styles.actionLabel, { color: Colors.accentGreen }]}>{language === "uk" ? "Вага" : "Weight"}</Text>
-              </Pressable>
-            </View>
-          </Animated.View>
         </View>
       </ScrollView>
+
+      {showScrollTop && (
+        <Pressable
+          onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+          style={{
+            position: "absolute",
+            bottom: insets.bottom + 24,
+            right: 20,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: Colors.primary,
+            alignItems: "center",
+            justifyContent: "center",
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.25,
+            shadowRadius: 6,
+            elevation: 6,
+          }}
+        >
+          <MaterialCommunityIcons name="arrow-up" size={22} color={Colors.textLight} />
+        </Pressable>
+      )}
 
       {/* Medical profile modal — backdrop + KAV + swipe-to-close */}
       <Modal visible={showMedicalModal} transparent animationType="slide" onRequestClose={() => setShowMedicalModal(false)}>
