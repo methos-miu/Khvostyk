@@ -138,7 +138,7 @@ export default function PetProfileScreen() {
       title: pet?.name ?? t.profile,
       headerRight: () =>
         pet ? (
-          <Pressable onPress={handleOptions} style={{ marginRight: 4, padding: 4 }}>
+          <Pressable onPress={handleOptions} style={{ marginRight: 0 }}>
             <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center" }}>
               <Text style={styles.optionsBtn}>⋯</Text>
             </View>
