@@ -2,11 +2,12 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
-import React, { useLayoutEffect, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   Alert,
+
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -16,28 +17,173 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from "react-native";
 import Animated, { FadeIn, FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { VaccinationBadge } from "@/components/ui/VaccinationBadge";
+import NetInfo from "@react-native-community/netinfo";
+
 import { Colors } from "@/constants/colors";
-import { usePets, MedicalProfile, Illness } from "@/context/PetsContext";
+import { usePets, MedicalProfile, Illness, HealthEvent, HealthEventStatus, CycleSlot } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { getSpeciesLabel } from "@/utils/speciesLabel";
-import { calculateAge, formatDateShort, formatDate } from "@/utils/notifications";
+import { calculateAge, formatDateShort, formatDate, getDaysUntil, parseDate } from "@/utils/notifications";
 import { getAnimalEmoji } from "@/constants/animals";
+import { getHealthEventIcon, getHealthEventColor } from "@/utils/healthEvents";
+import {
+  getDisplayEvents,
+  computeEventStatusV2,
+  isToday as isTodayStr,
+  getTodayStr,
+  getSeriesInterval,
+  addInterval,
+} from "@/utils/seriesUtils";
+
+// ─── Status square (same logic as health-events screen) ───────────────────────
+
+function StatusSquare({
+  status,
+  date,
+  onPress,
+  size = 28,
+}: {
+  status: HealthEventStatus;
+  date: string;
+  onPress: () => void;
+  size?: number;
+}) {
+  const isToday = isTodayStr(date);
+  let bg: string;
+  let icon: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
+  let color: string;
+
+  if (status === "done") {
+    bg = Colors.accentGreen + "20";
+    icon = "checkbox-marked";
+    color = Colors.accentGreen;
+  } else if (status === "overdue") {
+    bg = Colors.danger + "20";
+    icon = "close-box";
+    color = Colors.danger;
+  } else if (isToday) {
+    bg = "#FF8C0020";
+    icon = "checkbox-blank-outline";
+    color = "#FF8C00";
+  } else {
+    bg = Colors.textTertiary + "20";
+    icon = "checkbox-blank-outline";
+    color = Colors.textTertiary;
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={{ width: size + 8, height: size + 8, borderRadius: 8, backgroundColor: bg, alignItems: "center", justifyContent: "center" }}
+      hitSlop={6}
+    >
+      <MaterialCommunityIcons name={icon} size={size} color={color} />
+    </Pressable>
+  );
+}
+
+const COVER_HEIGHT = 290;
+
+const UK_MONTHS = ["січня","лютого","березня","квітня","травня","червня","липня","серпня","вересня","жовтня","листопада","грудня"];
+const UK_MONTHS_ABBR = ["січ","лют","бер","квіт","трав","черв","лип","серп","вер","жовт","лист","груд"];
+const EN_MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const EN_MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+function getRelativeLabel(dateStr: string, language: string): string {
+  const days = getDaysUntil(dateStr);
+  if (language === "uk") {
+    if (days === 0) return "Сьогодні";
+    if (days === 1) return "Завтра";
+    if (days === 2) return "Післязавтра";
+    if (days === -1) return "Вчора";
+    if (days === -2) return "Позавчора";
+    if (days > 0) {
+      if (days < 7) return `За ${days} дн.`;
+      const weeks = Math.round(days / 7);
+      if (days < 30) return `Через ${weeks} тиж.`;
+      const months = Math.round(days / 30.5);
+      if (days < 365) return `Через ${months} міс.`;
+      return `Через ${Math.round(days / 365)} р.`;
+    } else {
+      const abs = Math.abs(days);
+      if (abs < 7) return `${abs} дн. тому`;
+      const weeks = Math.round(abs / 7);
+      if (abs < 30) return `${weeks} тиж. тому`;
+      const months = Math.round(abs / 30.5);
+      if (abs < 365) return `${months} міс. тому`;
+      return `${Math.round(abs / 365)} р. тому`;
+    }
+  } else {
+    if (days === 0) return "Today";
+    if (days === 1) return "Tomorrow";
+    if (days === 2) return "In 2 days";
+    if (days === -1) return "Yesterday";
+    if (days === -2) return "2 days ago";
+    if (days > 0) {
+      if (days < 7) return `In ${days}d`;
+      const weeks = Math.round(days / 7);
+      if (days < 30) return `In ${weeks}w`;
+      const months = Math.round(days / 30.5);
+      if (days < 365) return `In ${months}mo`;
+      return `In ${Math.round(days / 365)}yr`;
+    } else {
+      const abs = Math.abs(days);
+      if (abs < 7) return `${abs}d ago`;
+      const weeks = Math.round(abs / 7);
+      if (abs < 30) return `${weeks}w ago`;
+      const months = Math.round(abs / 30.5);
+      if (abs < 365) return `${months}mo ago`;
+      return `${Math.round(abs / 365)}yr ago`;
+    }
+  }
+}
+
+function getDateLabel(dateStr: string, language: string): string {
+  const d = parseDate(dateStr);
+  if (!d) return "";
+  const day = d.getDate();
+  return language === "uk"
+    ? `${day} ${UK_MONTHS_ABBR[d.getMonth()]}`
+    : `${EN_MONTHS_SHORT[d.getMonth()]} ${day}`;
+}
+
+
+function getCardHeader(dateStr: string, language: string): string {
+  const days = getDaysUntil(dateStr);
+  const d = parseDate(dateStr);
+  if (!d) return "";
+  const dayNum = d.getDate();
+  const monthLabel = language === "uk" ? UK_MONTHS[d.getMonth()] : EN_MONTHS_SHORT[d.getMonth()];
+  const dateLabel = `${dayNum} ${monthLabel}`;
+  if (days === 0) return `${language === "uk" ? "Сьогодні" : "Today"} • ${dateLabel}`;
+  if (days === 1) return `${language === "uk" ? "Завтра" : "Tomorrow"} • ${dateLabel}`;
+  return dateLabel;
+}
 
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPet, deletePet, updatePet } = usePets();
-  const navigation = useNavigation();
+  const {
+    getPet, deletePet, updatePet, checkAndUpdateEventStatuses,
+    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent,
+  } = usePets();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
+  const { width: screenWidth } = useWindowDimensions();
+  const TILE_GAP = 8;
+  const CONTAINER_PADDING = 32; // body paddingHorizontal: 16 × 2
+  const STRIP_PADDING = 4;      // dateStrip contentContainerStyle paddingHorizontal: 2 × 2
+  const tileWidth = (screenWidth - CONTAINER_PADDING - STRIP_PADDING - TILE_GAP * 4) / 5;
 
   const scrollRef = useRef<ScrollView>(null);
+  const dateScrollRef = useRef<ScrollView>(null);
   const scrollViewHeight = useRef(0);
+  const advancingSeriesRef = useRef<Set<string>>(new Set());
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
@@ -45,6 +191,26 @@ export default function PetProfileScreen() {
   const [showIllnessForm, setShowIllnessForm] = useState(false);
   const [editingIllnessId, setEditingIllnessId] = useState<string | null>(null);
   const [illnessForm, setIllnessForm] = useState<Partial<Illness>>({});
+  const [activeDateStr, setActiveDateStr] = useState<string | null>(null);
+  const [expandedSlotEventId, setExpandedSlotEventId] = useState<string | null>(null);
+  const [slotOverrides, setSlotOverrides] = useState<Record<string, { slots: CycleSlot[]; status: HealthEventStatus }>>({});
+
+  useEffect(() => {
+    setSlotOverrides(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const eventId of Object.keys(next)) {
+        const event = timelineEvents.find(e => e.id === eventId);
+        if (!event) { delete next[eventId]; changed = true; continue; }
+        const override = next[eventId];
+        const matches = override.slots.every((s, i) =>
+          s.completed_at === event.cycleSlots?.[i]?.completed_at
+        );
+        if (matches) { delete next[eventId]; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [timelineEvents]);
 
   const BLOOD_TYPES = ["A", "B", "AB", "0", "DEA 1.1+", "DEA 1.1-", "DEA 1.2+", "DEA 1.2-", "DEA 3", "DEA 4", "DEA 5", "DEA 7", "A/B"];
 
@@ -72,8 +238,8 @@ export default function PetProfileScreen() {
     setShowIllnessForm(false);
   };
 
-  const deleteIllness = (id: string) => {
-    setMedForm(prev => ({ ...prev, illnesses: (prev.illnesses ?? []).filter(i => i.id !== id) }));
+  const deleteIllness = (illId: string) => {
+    setMedForm(prev => ({ ...prev, illnesses: (prev.illnesses ?? []).filter(i => i.id !== illId) }));
   };
 
   const medPanResponder = useRef(
@@ -87,6 +253,260 @@ export default function PetProfileScreen() {
   ).current;
 
   const pet = getPet(id);
+
+  const todayForHandlers = getTodayStr();
+
+  const handleShiftDialog = useCallback(async (event: HealthEvent, petId: string, modifiedFutureCount: number) => {
+    const interval = getSeriesInterval(event);
+    if (!interval) return;
+    const newNextDate = addInterval(todayForHandlers, interval.value, interval.unit);
+    const seriesId = event.seriesId ?? event.id;
+
+    if (modifiedFutureCount === 0) {
+      await shiftSeriesAnchor(petId, seriesId, newNextDate, false);
+      return;
+    }
+
+    const single = modifiedFutureCount === 1;
+    Alert.alert(
+      language === "uk"
+        ? (single ? "Одна подія має змінену дату" : `${modifiedFutureCount} подій мають змінені дати`)
+        : (single ? "One event has a modified date" : `${modifiedFutureCount} events have modified dates`),
+      language === "uk" ? "Що робити з нею?" : "What to do with them?",
+      [
+        {
+          text: language === "uk" ? (single ? "Посунути" : "Посунути всі") : (single ? "Shift" : "Shift all"),
+          onPress: async () => { await shiftSeriesAnchor(petId, seriesId, newNextDate, true); },
+        },
+        {
+          text: language === "uk" ? (single ? "Лишити" : "Лишити всі") : (single ? "Keep" : "Keep all"),
+          onPress: async () => { await shiftSeriesAnchor(petId, seriesId, newNextDate, false); },
+        },
+        { text: language === "uk" ? "Назад" : "Back", style: "cancel" },
+      ]
+    );
+  }, [shiftSeriesAnchor, todayForHandlers, language]);
+
+  const handleCompleteEvent = useCallback(async (event: HealthEvent) => {
+    if (!pet) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) {
+      Alert.alert(
+        language === "uk" ? "Немає інтернету" : "No internet",
+        language === "uk" ? "Позначити виконаним можна тільки з інтернет-з'єднанням" : "Completion requires an internet connection"
+      );
+      return;
+    }
+
+    const petId = pet.id;
+    const { nextDate, modifiedFutureCount } = await completeHealthEvent(petId, event.id);
+
+    if (event.recurrenceType === "one_time" || !nextDate) return;
+
+    const interval = getSeriesInterval(event);
+    if (!interval) return;
+
+    if (event.date === todayForHandlers) {
+      // On-time completion → silent advance
+      await markDoneAndAdvance(petId, event.id, nextDate);
+      return;
+    }
+
+    // Different day → ask about shifting
+    Alert.alert(
+      language === "uk" ? "Наступна подія" : "Next occurrence",
+      language === "uk"
+        ? `Наступна запланована на ${formatDateShort(nextDate)}. Посунути від сьогодні?`
+        : `Next is scheduled for ${formatDateShort(nextDate)}. Shift from today?`,
+      [
+        {
+          text: language === "uk" ? "Лишити" : "Keep",
+          onPress: async () => { await markDoneAndAdvance(petId, event.id, nextDate); },
+        },
+        {
+          text: language === "uk" ? "Посунути" : "Shift",
+          onPress: () => handleShiftDialog(event, petId, modifiedFutureCount),
+        },
+      ]
+    );
+  }, [pet, completeHealthEvent, markDoneAndAdvance, handleShiftDialog, todayForHandlers, language]);
+
+  const handleCompleteSlot = useCallback(async (event: HealthEvent, slotIndex: number) => {
+    if (!pet) return;
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const slots = event.cycleSlots ?? [];
+    const slot = slots[slotIndex];
+    if (!slot) return;
+
+    const updatedSlots = slots.map((s, i) =>
+      i === slotIndex
+        ? s.completed_at
+          ? { ...s, completed_at: undefined, completed_by: undefined }
+          : { ...s, completed_at: new Date().toISOString(), completed_by: undefined }
+        : s
+    );
+
+    const allDone = updatedSlots.every(s => !!s.completed_at);
+    const newStatus: HealthEventStatus = allDone
+      ? "done"
+      : computeEventStatusV2({ status: "planned", date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
+
+    // Optimistic update: reflect the change in the UI immediately before any async work.
+    // All subsequent async operations run against the database in the background;
+    // intermediate PetsContext re-renders are masked by this override so the schedule
+    // card and timeline never flicker or lose the event.
+    setSlotOverrides(prev => ({ ...prev, [event.id]: { slots: updatedSlots, status: newStatus } }));
+
+    const revert = (reason: string) => {
+      console.log('REVERT called:', reason);
+      setSlotOverrides(prev => {
+        const next = { ...prev };
+        delete next[event.id];
+        return next;
+      });
+    };
+
+    const net = await NetInfo.fetch();
+    if (!net.isConnected) {
+      revert('no internet');
+      Alert.alert(
+        language === "uk" ? "Немає інтернету" : "No internet",
+        language === "uk" ? "Позначити виконаним можна тільки з інтернет-з'єднанням" : "Completion requires an internet connection"
+      );
+      return;
+    }
+
+    try {
+      if (allDone && event.recurrenceType === "regular") {
+        // Guard against duplicate calls
+        if (advancingSeriesRef.current.has(event.id)) return;
+        advancingSeriesRef.current.add(event.id);
+
+        const interval = getSeriesInterval(event);
+        if (interval) {
+          const nextDate = addInterval(event.date, interval.value, interval.unit);
+          const withinEndDate = !event.repeatEndDate || nextDate <= event.repeatEndDate;
+          if (nextDate > event.date && withinEndDate) {
+            try {
+              await Promise.all([
+                markDoneAndAdvance(pet.id, event.id, nextDate),
+                updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots }),
+              ]);
+            } finally {
+              advancingSeriesRef.current.delete(event.id);
+            }
+            return;
+          }
+        }
+        advancingSeriesRef.current.delete(event.id);
+      }
+
+      const wasUnchecking = !!slot.completed_at;
+      if (wasUnchecking && !allDone && event.isCurrent === false && event.date < todayForHandlers) {
+        // Slot unchecked after series was advanced — restore this event as anchor.
+        const seriesId = event.seriesId;
+        if (seriesId) {
+          const orphan = pet.healthEvents?.find(
+            e => e.id !== event.id && e.seriesId === seriesId && e.date > event.date && e.isCurrent === true
+          );
+          if (orphan) await deleteHealthEvent(pet.id, orphan.id);
+        }
+        await updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots, status: newStatus, isCurrent: true });
+        return;
+      }
+
+      await updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots, status: newStatus });
+    } catch (error) {
+      console.error('handleCompleteSlot error:', error);
+      revert('catch block');
+      Alert.alert(
+        language === "uk" ? "Помилка" : "Error",
+        language === "uk" ? "Не вдалося оновити" : "Failed to update"
+      );
+    }
+  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, language, todayForHandlers]);
+
+  const handleUndoComplete = useCallback((event: HealthEvent) => {
+    if (!pet) return;
+    Alert.alert(
+      language === "uk" ? "Скасувати виконання?" : "Undo completion?",
+      "",
+      [
+        { text: language === "uk" ? "Ні" : "No", style: "cancel" },
+        {
+          text: language === "uk" ? "Так" : "Yes",
+          onPress: async () => {
+            await updateHealthEvent(pet.id, event.id, { status: "planned", isCurrent: true });
+          },
+        },
+      ]
+    );
+  }, [pet, updateHealthEvent, language]);
+
+  const timelineEvents = useMemo<HealthEvent[]>(() => {
+    if (!pet) return [];
+    return getDisplayEvents(pet.healthEvents ?? [])
+      .filter((e) => e.status !== "cancelled")
+      .map((e) => {
+        const ov = slotOverrides[e.id];
+        return ov ? { ...e, cycleSlots: ov.slots, status: ov.status } : e;
+      })
+      .sort((a, b) => {
+        const da = parseDate(a.date)?.getTime() ?? 0;
+        const db = parseDate(b.date)?.getTime() ?? 0;
+        return da - db;
+      });
+  }, [pet?.healthEvents, slotOverrides]);
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, HealthEvent[]> = {};
+    for (const e of timelineEvents) {
+      const dateStr = e.date;
+      if (!map[dateStr]) map[dateStr] = [];
+      map[dateStr].push(e);
+    }
+    return map;
+  }, [timelineEvents]);
+
+  const uniqueDates = useMemo(() => Object.keys(eventsByDate).sort(), [eventsByDate]);
+
+  const todayStr = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, "0");
+    const d = String(today.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }, []);
+
+  // Single chronological array: past + today + future. Today is always included.
+  const allDates = useMemo(() => {
+    if (uniqueDates.includes(todayStr)) return uniqueDates;
+    return [...uniqueDates, todayStr].sort();
+  }, [uniqueDates, todayStr]);
+
+  const todayIndex = allDates.indexOf(todayStr);
+
+  const futureDates = useMemo(() => uniqueDates.filter(d => d > todayStr), [uniqueDates, todayStr]);
+  const hasFutureEvents = futureDates.length > 0;
+  const futureTilesCount = futureDates.length;
+  const plusTileWidth = futureTilesCount === 0 ? tileWidth * 4 + TILE_GAP * 3
+                      : futureTilesCount === 1 ? tileWidth * 3 + TILE_GAP * 2
+                      : futureTilesCount === 2 ? tileWidth * 2 + TILE_GAP * 1
+                      : tileWidth;
+
+  useEffect(() => {
+    setActiveDateStr(todayStr);
+  }, [todayStr]);
+
+  useFocusEffect(
+    useCallback(() => {
+      checkAndUpdateEventStatuses();
+    }, [])
+  );
 
   const handleOptions = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -137,20 +557,6 @@ export default function PetProfileScreen() {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      title: pet?.name ?? t.profile,
-      headerRight: () =>
-        pet ? (
-          <Pressable onPress={handleOptions} style={{ marginRight: 0 }}>
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center" }}>
-              <Text style={styles.optionsBtn}>⋯</Text>
-            </View>
-          </Pressable>
-        ) : null,
-    });
-  }, [pet, navigation, t, language]);
-
   if (!pet) {
     return (
       <View style={styles.notFound}>
@@ -160,10 +566,6 @@ export default function PetProfileScreen() {
     );
   }
 
-  const upcomingVaccinations = [...pet.vaccinations]
-    .sort((a, b) => new Date(a.nextDate).getTime() - new Date(b.nextDate).getTime())
-    .slice(0, 3);
-
   const speciesLabel = getSpeciesLabel(pet.species, pet.gender, language, pet.customSpecies);
   const age = calculateAge(pet.birthdate, language);
   const latestWeight = (pet.weightHistory ?? []).length > 0
@@ -171,6 +573,15 @@ export default function PetProfileScreen() {
     : null;
   const med = pet.medicalProfile;
   const hasMedical = med && (med.allergies || med.chronicConditions || med.vetName || med.vetPhone || med.bloodType || (med.illnesses && med.illnesses.length > 0));
+
+  const activeEvents = activeDateStr ? (eventsByDate[activeDateStr] ?? []) : [];
+  const sortedActiveEvents = useMemo(() => {
+    const getFirstSlotTime = (e: HealthEvent) => e.cycleSlots?.[0]?.exact_time ?? e.time ?? "";
+    const timed = activeEvents.filter(e => getFirstSlotTime(e)).sort((a, b) => getFirstSlotTime(a).localeCompare(getFirstSlotTime(b)));
+    const untimed = activeEvents.filter(e => !getFirstSlotTime(e));
+    return [...timed, ...untimed];
+  }, [activeEvents]);
+  const cardHeader = activeDateStr ? getCardHeader(activeDateStr, language) : "";
 
   return (
     <>
@@ -184,54 +595,241 @@ export default function PetProfileScreen() {
         onScroll={(e) => setScrollY(e.nativeEvent.contentOffset.y)}
         scrollEventThrottle={16}
       >
+        {/* ── Cover Photo Header ───────────────────────────── */}
         <Animated.View entering={FadeIn}>
-          <LinearGradient colors={[Colors.gradientStart, Colors.gradientEnd]} style={styles.heroSection}>
-            <View style={styles.heroContent}>
-              <View style={styles.heroAvatarWrap}>
-                {pet.photoUri ? (
-                  <Image source={{ uri: pet.photoUri }} style={styles.heroPhoto} contentFit="cover" />
-                ) : (
-                  <View style={styles.heroEmojiWrap}>
-                    <Text style={styles.heroEmoji}>{getAnimalEmoji(pet.species, pet.customSpecies)}</Text>
-                  </View>
-                )}
+          <View style={styles.cover}>
+            {pet.photoUri ? (
+              <Image source={{ uri: pet.photoUri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+            ) : (
+              <View style={[StyleSheet.absoluteFill, styles.coverEmojiBackground]}>
+                <Text style={styles.coverEmoji}>{getAnimalEmoji(pet.species, pet.customSpecies)}</Text>
               </View>
-              <Text style={styles.heroName}>{pet.name}</Text>
-              <Text style={styles.heroBreed}>
-                {speciesLabel}{pet.breed ? ` • ${pet.breed}` : ""}
+            )}
+            {/* Bottom gradient */}
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.72)"]}
+              locations={[0.25, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            {/* Nav row */}
+            <View style={[styles.coverNavRow, { paddingTop: insets.top + 6 }]}>
+              <Pressable onPress={() => router.back()} style={styles.coverNavBtn} hitSlop={8}>
+                <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
+                <Text style={styles.coverNavText}>{t.back}</Text>
+              </Pressable>
+              <Pressable onPress={handleOptions} style={styles.coverNavBtn} hitSlop={8}>
+                <Text style={styles.coverDotsText}>⋯</Text>
+              </Pressable>
+            </View>
+            {/* Pet name & subtitle */}
+            <View style={styles.coverInfo}>
+              <Text style={styles.coverName} numberOfLines={1}>{pet.name}</Text>
+              <Text style={styles.coverSubtitle} numberOfLines={1}>
+                {[speciesLabel, pet.breed, age].filter(Boolean).join(" • ")}
               </Text>
             </View>
-          </LinearGradient>
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(40)}>
-          <View style={[styles.quickActions, { marginHorizontal: 16, marginTop: 16 }]}>
-            <Pressable
-              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/vaccinations/[id]", params: { id: pet.id } }); }}
-              style={[styles.actionButton, { backgroundColor: Colors.primaryLight }]}
-            >
-              <MaterialCommunityIcons name="medical-bag" size={24} color={Colors.primary} />
-              <Text style={[styles.actionLabel, { color: Colors.primary }]}>{t.vaccinations}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/documents/[id]", params: { id: pet.id } }); }}
-              style={[styles.actionButton, { backgroundColor: "#FFF0F0" }]}
-            >
-              <MaterialCommunityIcons name="file-document-outline" size={24} color={Colors.accent} />
-              <Text style={[styles.actionLabel, { color: Colors.accent }]}>{t.documents}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/weight/[id]", params: { id: pet.id } }); }}
-              style={[styles.actionButton, { backgroundColor: "#F0FFF5" }]}
-            >
-              <MaterialCommunityIcons name="chart-line" size={24} color={Colors.accentGreen} />
-              <Text style={[styles.actionLabel, { color: Colors.accentGreen }]}>{language === "uk" ? "Вага" : "Weight"}</Text>
-            </Pressable>
           </View>
         </Animated.View>
 
         <View style={styles.body}>
+          {/* ── Upcoming Events Card ─────────────────────── */}
+          <Animated.View entering={FadeInDown.delay(40)} style={styles.eventCardOverlap}>
+            <Pressable
+              onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/health-events", params: { petId: pet.id } }); }}
+              style={styles.eventCard}
+            >
+              <Text style={styles.eventCardHeader}>{cardHeader}</Text>
+              <View style={{ flex: 1, gap: 6 }}>
+                {sortedActiveEvents.map((event, index) => {
+                  const isMultiSlot = (event.timesPerCycle ?? 1) > 1 && (event.cycleSlots?.length ?? 0) > 1;
+                  const isExpanded = expandedSlotEventId === event.id;
+                  const doneSlots = event.cycleSlots?.filter(s => !!s.completed_at).length ?? 0;
+                  const totalSlots = event.cycleSlots?.length ?? 1;
+                  const firstSlotTime = event.cycleSlots?.[0]?.exact_time ?? event.time ?? "";
+                  const statusV2 = computeEventStatusV2({
+                    status: event.status, date: event.date, type: event.type,
+                    cycleSlots: event.cycleSlots, time: event.time,
+                  });
+                  const aggregateStatus: HealthEventStatus = isMultiSlot ? (() => {
+                    if (doneSlots === totalSlots) return "done";
+                    const base = computeEventStatusV2({ status: "planned", date: event.date, type: event.type, cycleSlots: event.cycleSlots, time: event.time });
+                    return base === "overdue" ? "overdue" : "planned";
+                  })() : statusV2;
+
+                  return (
+                    <View key={`${event.id}_${index}`}>
+                      {/* ── Main row ── */}
+                      <View style={styles.eventRow}>
+                        <Text style={styles.eventTimeCol}>{firstSlotTime || "—"}</Text>
+                        <Text style={styles.eventTitle} numberOfLines={1}>
+                          {(t as any)[`he_${event.type}`] ?? event.title}
+                          {isMultiSlot ? `  ${doneSlots}/${totalSlots} ✓` : ""}
+                        </Text>
+                        {isMultiSlot && (
+                          <Pressable
+                            onPress={(ev) => { ev.stopPropagation?.(); setExpandedSlotEventId(isExpanded ? null : event.id); }}
+                            hitSlop={8}
+                            style={{ padding: 2 }}
+                          >
+                            <MaterialCommunityIcons
+                              name={isExpanded ? "chevron-up" : "chevron-down"}
+                              size={18}
+                              color={Colors.textTertiary}
+                            />
+                          </Pressable>
+                        )}
+                        {isMultiSlot ? (
+                          <View pointerEvents="none">
+                            <StatusSquare status={aggregateStatus} date={event.date} onPress={() => {}} size={24} />
+                          </View>
+                        ) : (
+                          <Pressable onPress={(ev) => { ev.stopPropagation?.(); event.status === "done" ? handleUndoComplete(event) : handleCompleteEvent(event); }}>
+                            <StatusSquare status={statusV2} date={event.date} onPress={() => { event.status === "done" ? handleUndoComplete(event) : handleCompleteEvent(event); }} size={24} />
+                          </Pressable>
+                        )}
+                      </View>
+
+                      {/* ── Expanded slots ── */}
+                      {isMultiSlot && isExpanded && event.cycleSlots!.map((slot, i) => {
+                        const slotDone = !!slot.completed_at;
+                        const slotStatus: HealthEventStatus = slotDone ? "done" : statusV2 === "overdue" ? "overdue" : "planned";
+                        return (
+                          <View key={i} style={[styles.eventRow, { paddingLeft: 42, marginTop: 2 }]}>
+                            <Text style={[styles.eventTimeCol, { width: 50 }]}>{slot.exact_time || "—"}</Text>
+                            <Text style={[styles.eventTitle, { fontSize: 13, color: slotDone ? Colors.textTertiary : Colors.text }]} numberOfLines={1}>
+                              {slot.slot_name}
+                            </Text>
+                            <StatusSquare status={slotStatus} date={event.date} onPress={() => handleCompleteSlot(event, i)} size={20} />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+                {sortedActiveEvents.length === 0 && (
+                  <Text style={styles.eventCardEmpty}>
+                    {activeDateStr === todayStr
+                      ? (language === "uk" ? `У ${pet.name} на сьогодні нічого не заплановано` : `Nothing planned for ${pet.name} today`)
+                      : (language === "uk" ? "Немає подій" : "No events")}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.eventCardFooter}>
+                <Text style={styles.eventCardSeeAll}>{language === "uk" ? "Всі події" : "All events"}</Text>
+                <MaterialCommunityIcons name="chevron-right" size={15} color={Colors.primary} />
+              </View>
+            </Pressable>
+          </Animated.View>
+
+          {/* ── Date Strip Calendar ──────────────────────── */}
+          <ScrollView
+            horizontal
+            ref={dateScrollRef}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.dateStrip}
+            onContentSizeChange={() => {
+              dateScrollRef.current?.scrollTo({ x: todayIndex * (tileWidth + TILE_GAP), animated: false });
+            }}
+          >
+            {allDates.map((dateStr) => {
+              const isActive = dateStr === activeDateStr;
+              const isToday = dateStr === todayStr;
+              const relLabel = getRelativeLabel(dateStr, language);
+              const parsedDate = parseDate(dateStr);
+              const dayNum = parsedDate ? String(parsedDate.getDate()) : "";
+              const monthFull = parsedDate
+                ? (language === "uk" ? UK_MONTHS[parsedDate.getMonth()] : EN_MONTHS_FULL[parsedDate.getMonth()])
+                : "";
+              const evts = eventsByDate[dateStr] ?? [];
+              const sortedEvts = [...evts].sort((a, b) => (a.cycleSlots?.[0]?.exact_time ?? a.time ?? "").localeCompare(b.cycleSlots?.[0]?.exact_time ?? b.time ?? ""));
+              const hasEvents = sortedEvts.length > 0;
+              const firstEvent = sortedEvts[0];
+              const firstColor = hasEvents ? getHealthEventColor(firstEvent.type) : Colors.textTertiary;
+              const firstIcon = hasEvents ? getHealthEventIcon(firstEvent.type) : "circle-small";
+              const extraCount = sortedEvts.length - 1;
+              const hasOverdue = sortedEvts.some(e => e.status === "overdue");
+              return (
+                <Pressable
+                  key={dateStr}
+                  onPress={() => { Haptics.selectionAsync(); setActiveDateStr(dateStr); }}
+                  style={[styles.dateTile, isActive && styles.dateTileActive, { width: tileWidth, marginRight: TILE_GAP, overflow: "visible" }]}
+                >
+                  {hasOverdue && (
+                    <View style={{ position: "absolute", top: 5, right: 5, width: 7, height: 7, borderRadius: 3.5, backgroundColor: Colors.danger, zIndex: 10 }} />
+                  )}
+                  <View style={{ alignItems: "center", gap: 0, marginTop: 0 }}>
+                    <Text style={[styles.dateTileDate, isActive && styles.dateTileDateActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{dayNum}</Text>
+                    <Text style={[styles.dateTileTopLabel, isActive && styles.dateTileTopLabelActive, { marginTop: -2 }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{monthFull}</Text>
+                  </View>
+                  {(hasEvents || isToday) ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+                      <View style={[styles.dateTileIconWrap, { backgroundColor: firstColor + "33" }]}>
+                        <MaterialCommunityIcons name={firstIcon as any} size={11} color={firstColor} />
+                      </View>
+                      {extraCount > 0 && <Text style={[styles.dateTileExtraBadge, { color: firstColor }]}>+{extraCount}</Text>}
+                    </View>
+                  ) : null}
+                  <Text style={[styles.dateTileTopLabel, isActive && styles.dateTileTopLabelActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{relLabel}</Text>
+                  {isToday && (
+                    <View style={{ position: "absolute", bottom: -7, alignSelf: "center", zIndex: 20, width: 0, height: 0, borderLeftWidth: 10, borderRightWidth: 10, borderBottomWidth: 14, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: "#E53935" }} />
+                  )}
+                </Pressable>
+              );
+            })}
+            {!hasFutureEvents ? (
+              <View style={[styles.dateTileEmpty, { width: tileWidth * 4 + TILE_GAP * 3 }]}>
+                <Text style={styles.dateTileEmptyText}>
+                  {language === "uk" ? "Ще нічого не заплановано" : "Nothing planned yet"}
+                </Text>
+                <Pressable
+                  onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/select-event-template/[id]", params: { id: pet.id } }); }}
+                  style={styles.addEventTileBtn}
+                >
+                  <Text style={styles.addEventTileBtnText}>
+                    {language === "uk" ? "+ Додати подію" : "+ Add event"}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/select-event-template/[id]", params: { id: pet.id } }); }}
+                style={[styles.dateTilePlus, { width: plusTileWidth }]}
+              >
+                <MaterialCommunityIcons name="plus" size={26} color={Colors.primary} />
+              </Pressable>
+            )}
+          </ScrollView>
+
+          {/* ── Section Tabs ─────────────────────────────── */}
           <Animated.View entering={FadeInDown.delay(80)}>
+            <View style={styles.quickActions}>
+              <Pressable
+                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/health-events", params: { petId: pet.id } }); }}
+                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              >
+                <MaterialCommunityIcons name="calendar-month" size={24} color={Colors.primary} />
+                <Text style={styles.actionLabel}>{language === "uk" ? "Події" : "Events"}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/documents/[id]", params: { id: pet.id } }); }}
+                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              >
+                <MaterialCommunityIcons name="file-document-outline" size={24} color={Colors.primary} />
+                <Text style={styles.actionLabel}>{t.documents}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/weight/[id]", params: { id: pet.id } }); }}
+                style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
+              >
+                <MaterialCommunityIcons name="chart-line" size={24} color={Colors.primary} />
+                <Text style={styles.actionLabel}>{language === "uk" ? "Вага" : "Weight"}</Text>
+              </Pressable>
+            </View>
+          </Animated.View>
+
+          {/* ── Details ──────────────────────────────────── */}
+          <Animated.View entering={FadeInDown.delay(100)}>
             <View style={styles.infoCard}>
               <Text style={styles.cardSectionTitle}>{t.details}</Text>
               <View style={styles.infoRow}>
@@ -302,7 +900,7 @@ export default function PetProfileScreen() {
 
           {/* Personality & Description */}
           {(pet.personality || pet.description) ? (
-            <Animated.View entering={FadeInDown.delay(100)}>
+            <Animated.View entering={FadeInDown.delay(120)}>
               <View style={styles.infoCard}>
                 <Text style={styles.cardSectionTitle}>{language === "uk" ? "Характер та опис" : "Personality & Description"}</Text>
                 {pet.personality ? (
@@ -316,7 +914,7 @@ export default function PetProfileScreen() {
                 {pet.description ? (
                   <View style={{ padding: 12, paddingHorizontal: 14 }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                      <MaterialCommunityIcons name="text-outline" size={18} color={Colors.primary} />
+                      <MaterialCommunityIcons name="note-text-outline" size={18} color={Colors.primary} />
                       <Text style={styles.infoLabel}>{language === "uk" ? "Опис" : "Description"}</Text>
                     </View>
                     <Text style={[styles.infoValue, { textAlign: "left" }]}>{pet.description}</Text>
@@ -326,8 +924,8 @@ export default function PetProfileScreen() {
             </Animated.View>
           ) : null}
 
-          {/* Medical profile */}
-          <Animated.View entering={FadeInDown.delay(120)}>
+          {/* Medical Profile */}
+          <Animated.View entering={FadeInDown.delay(140)}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{language === "uk" ? "Медичний профіль" : "Medical Profile"}</Text>
               <Pressable onPress={openMedicalModal}>
@@ -408,70 +1006,19 @@ export default function PetProfileScreen() {
               </Pressable>
             )}
           </Animated.View>
-
-          {/* Vaccinations */}
-          <Animated.View entering={FadeInDown.delay(160)}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t.vaccinations}</Text>
-              <Pressable onPress={() => { Haptics.selectionAsync(); router.push({ pathname: "/pet/vaccinations/[id]", params: { id: pet.id } }); }}>
-                <Text style={styles.seeAll}>{t.seeAll}</Text>
-              </Pressable>
-            </View>
-
-            {upcomingVaccinations.length === 0 ? (
-              <Pressable
-                onPress={() => router.push({ pathname: "/pet/add-vaccination/[id]", params: { id: pet.id } })}
-                style={styles.emptyCard}
-              >
-                <MaterialCommunityIcons name="plus-circle-outline" size={26} color={Colors.primary} />
-                <Text style={styles.emptyCardText}>{t.addVaccination}</Text>
-              </Pressable>
-            ) : (
-              <View style={styles.card}>
-                {upcomingVaccinations.map((v, i) => (
-                  <View key={v.id}>
-                    {i > 0 && <View style={styles.divider} />}
-                    <View style={styles.vaccinationRow}>
-                      <View style={styles.vaccinationInfo}>
-                        <Text style={styles.vaccinationName}>{v.name}</Text>
-                        <Text style={styles.vaccinationDate}>{t.next}: {formatDateShort(v.nextDate)}</Text>
-                      </View>
-                      <VaccinationBadge nextDate={v.nextDate} />
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </Animated.View>
-
         </View>
       </ScrollView>
 
       {showScrollTop && scrollY > 100 && (
         <Pressable
           onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
-          style={{
-            position: "absolute",
-            bottom: insets.bottom + 24,
-            right: 20,
-            width: 44,
-            height: 44,
-            borderRadius: 22,
-            backgroundColor: Colors.primary,
-            alignItems: "center",
-            justifyContent: "center",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.25,
-            shadowRadius: 6,
-            elevation: 6,
-          }}
+          style={styles.scrollTopBtn}
         >
           <MaterialCommunityIcons name="arrow-up" size={22} color={Colors.textLight} />
         </Pressable>
       )}
 
-      {/* Medical profile modal — backdrop + KAV + swipe-to-close */}
+      {/* Medical Profile Modal */}
       <Modal visible={showMedicalModal} transparent animationType="slide" onRequestClose={() => setShowMedicalModal(false)}>
         <View style={styles.modalOverlay}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowMedicalModal(false)} />
@@ -511,7 +1058,6 @@ export default function PetProfileScreen() {
                   multiline
                 />
 
-                {/* Blood Type */}
                 <Text style={styles.medLabel}>{language === "uk" ? "Група крові" : "Blood Type"}</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                   <View style={{ flexDirection: "row", gap: 8, paddingVertical: 4 }}>
@@ -527,7 +1073,6 @@ export default function PetProfileScreen() {
                   </View>
                 </ScrollView>
 
-                {/* Illnesses */}
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
                   <Text style={styles.medLabel}>{language === "uk" ? "Хвороби" : "Illnesses"}</Text>
                   <Pressable onPress={openIllnessAdd} style={styles.illnessAddBtn}>
@@ -553,7 +1098,6 @@ export default function PetProfileScreen() {
                   </View>
                 ))}
 
-                {/* Inline illness form */}
                 {showIllnessForm && (
                   <View style={styles.illnessFormBox}>
                     <Text style={styles.medLabel}>{editingIllnessId ? (language === "uk" ? "Редагувати хворобу" : "Edit illness") : (language === "uk" ? "Нова хвороба" : "New illness")}</Text>
@@ -635,33 +1179,257 @@ const styles = StyleSheet.create({
   scrollContent: {},
   notFound: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
   notFoundText: { fontSize: 16, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
-  optionsBtn: { fontSize: 24, color: Colors.text, fontWeight: "700", lineHeight: 26 },
-  heroSection: { paddingTop: 24, paddingBottom: 32, paddingHorizontal: 20 },
-  heroContent: { alignItems: "center" },
-  heroAvatarWrap: {
-    position: "relative", marginBottom: 14,
-    borderRadius: 54, borderWidth: 3, borderColor: "rgba(255,255,255,0.35)", overflow: "visible",
+
+  // ── Cover Photo Header ────────────────────────────────
+  cover: { height: COVER_HEIGHT, width: "100%" },
+  coverEmojiBackground: {
+    backgroundColor: Colors.gradientStart,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  heroPhoto: { width: 108, height: 108, borderRadius: 54 },
-  heroEmojiWrap: {
-    width: 108, height: 108, borderRadius: 54,
-    backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center",
+  coverEmoji: { fontSize: 90, opacity: 0.85 },
+  coverNavRow: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingBottom: 8,
+    zIndex: 10,
   },
-  heroEmoji: { fontSize: 50 },
-  heroName: { fontSize: 28, fontFamily: "Inter_700Bold", color: Colors.textLight, marginBottom: 4 },
-  heroBreed: { fontSize: 15, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.82)", marginBottom: 20 },
-  heroStats: {
-    flexDirection: "row", backgroundColor: "rgba(255,255,255,0.15)",
-    borderRadius: 18, padding: 14, gap: 12, alignItems: "center",
+  coverNavBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.28)",
   },
-  heroStat: { flex: 1, alignItems: "center" },
-  heroStatValue: { fontSize: 15, fontFamily: "Inter_700Bold", color: Colors.textLight },
-  heroStatLabel: { fontSize: 11, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.72)", marginTop: 2 },
-  heroStatDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.25)" },
-  body: { padding: 16, gap: 16 },
+  coverNavText: {
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: "#fff",
+  },
+  coverDotsText: {
+    fontSize: 22,
+    color: "#fff",
+    fontWeight: "700",
+    lineHeight: 24,
+    paddingHorizontal: 4,
+  },
+  coverInfo: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 18,
+    paddingBottom: 50,
+    zIndex: 10,
+  },
+  coverName: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: "#fff",
+    marginBottom: 4,
+    textShadowColor: "rgba(0,0,0,0.4)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 4,
+  },
+  coverSubtitle: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.85)",
+    textShadowColor: "rgba(0,0,0,0.3)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+
+  // ── Body ──────────────────────────────────────────────
+  body: { paddingTop: 0, paddingHorizontal: 16, paddingBottom: 16, gap: 14 },
+  eventCardOverlap: { marginTop: -30, zIndex: 2 },
+
+  // ── Upcoming Events Card ──────────────────────────────
+  eventCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 18,
+    padding: 16,
+    minHeight: 124,
+    shadowColor: '#3D1C02',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 10,
+  },
+  eventCardHeader: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
+    color: Colors.primary,
+    marginBottom: 2,
+  },
+  eventRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  eventTimeCol: {
+    width: 42,
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.textSecondary,
+    flexShrink: 0,
+  },
+  eventTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+    color: Colors.text,
+  },
+  eventCardEmpty: {
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: Colors.textTertiary,
+    textAlign: "center",
+    paddingVertical: 4,
+  },
+  eventCardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    marginTop: 2,
+    gap: 2,
+  },
+  eventCardSeeAll: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: Colors.primary,
+  },
+
+  // ── Date Strip Calendar ───────────────────────────────
+  dateStrip: {
+    paddingHorizontal: 2,
+    flexDirection: "row",
+    paddingVertical: 2,
+  },
+  dateTile: {
+    width: 72,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    gap: 2,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+  },
+  dateTileActive: {
+    borderColor: Colors.primary,
+    backgroundColor: Colors.primaryLight,
+  },
+  dateTilePlus: {
+    width: 72,
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+  },
+  dateTileEmpty: {
+    borderRadius: 16,
+    backgroundColor: Colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    gap: 10,
+    shadowColor: '#3D1C02',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderStyle: "dashed",
+  },
+  dateTileEmptyText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    textAlign: "center",
+    maxWidth: 140,
+  },
+  addEventTileBtn: {
+    backgroundColor: Colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  addEventTileBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+  },
+  dateTileTopLabel: {
+    fontSize: 10,
+    lineHeight: 12,
+    fontFamily: "Inter_500Medium",
+    color: Colors.textSecondary,
+    textAlign: "center",
+  },
+  dateTileTopLabelActive: {
+    color: Colors.primary,
+    fontFamily: "Inter_600SemiBold",
+  },
+  dateTileDate: {
+    fontSize: 22,
+    lineHeight: 22,
+    fontFamily: "Inter_700Bold",
+    color: Colors.text,
+    textAlign: "center",
+  },
+  dateTileDateActive: {
+    color: Colors.primary,
+  },
+  dateTileIconWrap: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dateTileExtraBadge: {
+    fontSize: 9,
+    fontFamily: "Inter_700Bold",
+  },
+
+  // ── Section Tabs ──────────────────────────────────────
+  quickActions: { flexDirection: "row", gap: 10 },
+  actionButton: {
+    flex: 1, borderRadius: 18, padding: 14, alignItems: "center", gap: 8,
+    backgroundColor: "#F5EDE6",
+    shadowColor: '#3D1C02', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    borderWidth: 1, borderColor: "#E8D5C0",
+  },
+  actionButtonPressed: {
+    backgroundColor: "#EAD9CC",
+  },
+  actionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#3D1C02", textAlign: "center" },
+
+  // ── Info Cards ────────────────────────────────────────
   infoCard: {
     backgroundColor: Colors.surface, borderRadius: 18, overflow: "hidden",
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 14, elevation: 4,
+    borderWidth: 1, borderColor: Colors.border,
+    shadowColor: '#3D1C02', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   cardSectionTitle: {
     fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,
@@ -674,28 +1442,38 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 10 },
   sectionTitle: { fontSize: 17, fontFamily: "Inter_600SemiBold", color: Colors.text },
   seeAll: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.primary },
-  card: {
-    backgroundColor: Colors.surface, borderRadius: 18, overflow: "hidden",
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 14, elevation: 4,
-  },
-  vaccinationRow: { flexDirection: "row", alignItems: "center", padding: 14, gap: 12 },
-  vaccinationInfo: { flex: 1 },
-  vaccinationName: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.text },
-  vaccinationDate: { fontSize: 13, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
   emptyCard: {
     backgroundColor: Colors.surface, borderRadius: 18, padding: 20,
     alignItems: "center", justifyContent: "center", gap: 8,
     borderWidth: 2, borderColor: Colors.border, borderStyle: "dashed", flexDirection: "row",
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 2,
+    shadowColor: '#3D1C02', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
   emptyCardText: { fontSize: 15, fontFamily: "Inter_500Medium", color: Colors.primary },
-  quickActions: { flexDirection: "row", gap: 10 },
-  actionButton: { flex: 1, borderRadius: 18, padding: 14, alignItems: "center", gap: 8 },
-  actionLabel: { fontSize: 11, fontFamily: "Inter_600SemiBold", textAlign: "center" },
+
+  // ── Scroll Top Button ─────────────────────────────────
+  scrollTopBtn: {
+    position: "absolute",
+    bottom: 24,
+    right: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+
+  // ── Medical Modal ─────────────────────────────────────
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
   kavWrap: { justifyContent: "flex-end" },
   modalSheet: {
-    backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, maxHeight: "80%",
+    backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderWidth: 1, borderColor: Colors.border, maxHeight: "80%",
   },
   handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },

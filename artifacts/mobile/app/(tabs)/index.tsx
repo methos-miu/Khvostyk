@@ -116,7 +116,7 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
 export default function HomeScreen() {
   const { pets, isLoaded, isSyncing } = usePets();
   const isLoading = !isLoaded || (isSyncing && pets.length === 0);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
 
@@ -127,19 +127,18 @@ export default function HomeScreen() {
         style={[styles.header, { paddingTop: topInset + 12 }]}
       >
         <Animated.View entering={FadeInUp.delay(50)} style={styles.headerContent}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.headerTitle}>{t.appName}</Text>
-            <Text style={styles.headerSubtitle}>
-              {isLoading
-                ? "..."
-                : pets.length === 0
-                ? t.noPetsSubtitle
-                : pets.length === 1
-                ? t.onePet
-                : t.manyPets(pets.length)}
-            </Text>
-          </View>
-          <Animated.View entering={FadeInRight.delay(100)}>
+          {/* Left spacer — mirrors right side width so title is truly centered */}
+          <View style={styles.headerSide} />
+
+          <Text style={styles.headerTitle}>
+            {language === "uk" ? "Мої хвостики" : "My Pets"}
+          </Text>
+
+          {/* Right side: pet count + add button */}
+          <View style={styles.headerSide}>
+            {!isLoading && pets.length > 0 && (
+              <Text style={styles.headerCount}>{pets.length}</Text>
+            )}
             <Pressable
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -149,7 +148,7 @@ export default function HomeScreen() {
             >
               <MaterialCommunityIcons name="plus" size={28} color={Colors.textLight} />
             </Pressable>
-          </Animated.View>
+          </View>
         </Animated.View>
       </LinearGradient>
 
@@ -198,12 +197,9 @@ export default function HomeScreen() {
             styles.listContent,
             { paddingBottom: Platform.OS === "web" ? 100 : 90 },
           ]}
+          directionalLockEnabled={true}
           showsVerticalScrollIndicator={false}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <Text style={styles.listHeaderText}>{t.pets}</Text>
-            </View>
-          }
+          ListHeaderComponent={<View style={styles.listHeaderSpacer} />}
           ListFooterComponent={() => (
             <Pressable
               onPress={() => {
@@ -230,24 +226,28 @@ export default function HomeScreen() {
 }
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingBottom: 24 },
+  header: { paddingHorizontal: 20, paddingBottom: 20 },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
   },
-  headerLeft: { flex: 1 },
+  headerSide: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+  },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 22,
     fontFamily: "Inter_700Bold",
     color: Colors.textLight,
-    letterSpacing: 0.5,
+    textAlign: "center",
   },
-  headerSubtitle: {
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    color: "rgba(255,255,255,0.78)",
-    marginTop: 2,
+  headerCount: {
+    fontSize: 15,
+    fontFamily: "Inter_600SemiBold",
+    color: "rgba(255,255,255,0.85)",
   },
   addButton: {
     width: 46,
@@ -260,15 +260,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.3)",
   },
   listContent: { padding: 16 },
-  listHeader: { marginBottom: 12 },
-  listHeaderText: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.6,
-    marginLeft: 4,
-  },
+  listHeaderSpacer: { height: 4 },
   card: {
     backgroundColor: Colors.surface,
     borderRadius: 22,

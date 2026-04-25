@@ -1,6 +1,14 @@
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
-import { Pet, Vaccination } from "@/context/PetsContext";
+import { Pet, Vaccination, HealthEvent } from "@/context/PetsContext";
+import {
+  generateSeriesEvents,
+  getSeriesInterval,
+  slotNotificationTime,
+  getTodayStr,
+  addInterval,
+  dateStrToDate,
+} from "@/utils/seriesUtils";
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -268,6 +276,231 @@ export function getNextBirthday(birthdate: string): Date | null {
   let next = new Date(thisYear, birth.getMonth(), birth.getDate());
   if (next <= now) next = new Date(thisYear + 1, birth.getMonth(), birth.getDate());
   return next;
+}
+
+/**
+ * Schedule up to 4 notifications for a health event:
+ *  7 days before, 3 days before, 1 day before (all at 09:00),
+ *  and at the exact event time on the day itself.
+ * Uses nextDate if set, otherwise date.
+ * Returns the scheduled notification IDs.
+ */
+export async function scheduleHealthEventReminders(
+  pet: Pet,
+  event: HealthEvent,
+  lang: "uk" | "en" = "uk"
+): Promise<string[]> {
+  if (Platform.OS === "web") return [];
+
+  const targetStr = event.nextDate || event.date;
+  const targetDate = parseDate(targetStr);
+  if (!targetDate) return [];
+
+  const timeParts = (event.nextTime || event.time || "09:00").split(":").map(Number);
+  const eventHour = timeParts[0] ?? 9;
+  const eventMinute = timeParts[1] ?? 0;
+
+  const now = new Date();
+  const ids: string[] = [];
+
+  const trySchedule = async (fireDate: Date, offsetDays: number): Promise<void> => {
+    if (fireDate <= now) return;
+    try {
+      const title =
+        lang === "uk"
+          ? `Нагадування: ${event.title}`
+          : `Reminder: ${event.title}`;
+      const body =
+        offsetDays === 0
+          ? lang === "uk"
+            ? `Сьогодні: ${event.title} (${pet.name})`
+            : `Today: ${event.title} (${pet.name})`
+          : lang === "uk"
+          ? `Через ${offsetDays} дн.: ${event.title} (${pet.name})`
+          : `In ${offsetDays} day${offsetDays === 1 ? "" : "s"}: ${event.title} (${pet.name})`;
+
+      const id = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data: { petId: pet.id, eventId: event.id, type: "health_event" },
+          sound: true,
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
+          date: fireDate,
+        },
+      });
+      ids.push(id);
+    } catch (e) {
+      if (__DEV__) console.warn("scheduleHealthEventReminders:", e);
+    }
+  };
+
+  const makeDate = (daysOffset: number, hour: number, minute: number): Date => {
+    const d = new Date(targetDate);
+    d.setDate(d.getDate() - daysOffset);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+
+  await trySchedule(makeDate(7, 9, 0), 7);
+  await trySchedule(makeDate(3, 9, 0), 3);
+  await trySchedule(makeDate(1, 9, 0), 1);
+  await trySchedule(makeDate(0, eventHour, eventMinute), 0);
+
+  return ids;
+}
+
+export async function cancelHealthEventNotifications(ids: string[]): Promise<void> {
+  if (Platform.OS === "web") return;
+  for (const id of ids) {
+    await cancelNotification(id).catch(() => {});
+  }
+}
+
+// ─── NEW: Schedule notifications for next 3 days per slot ────────────────────
+
+/**
+ * Schedule notifications for a health event for the next `daysAhead` days.
+ * For each occurrence within that window:
+ *   - Slots with exact_time → fire at (exact_time - reminder_minutes)
+ *   - Slots without exact_time → fire at 10:00
+ * Replaces the old scheduleHealthEventReminders for new-style events.
+ */
+export async function scheduleSeriesNotifications(
+  pet: Pet,
+  anchor: HealthEvent,
+  lang: "uk" | "en" = "uk",
+  daysAhead = 3
+): Promise<string[]> {
+  if (Platform.OS === "web") return [];
+
+  const today = getTodayStr();
+  const limitDate = addInterval(today, daysAhead, "day");
+  const occurrences = generateSeriesEvents(anchor, [], limitDate);
+
+  const now = new Date();
+  const ids: string[] = [];
+
+  for (const event of occurrences) {
+    if (event.date < today || event.date > limitDate) continue;
+
+    const slots = (event.cycleSlots && event.cycleSlots.length > 0)
+      ? event.cycleSlots
+      : [{ slot_name: "Весь день", reminder_minutes: 0, exact_time: event.time ?? undefined }];
+
+    for (const slot of slots) {
+      const fireDate = slotNotificationTime(event.date, slot);
+      if (fireDate <= now) continue;
+
+      const slotLabel = slot.slot_name !== "Весь день" ? ` (${slot.slot_name})` : "";
+      const title = lang === "uk"
+        ? `Нагадування: ${event.title}${slotLabel}`
+        : `Reminder: ${event.title}${slotLabel}`;
+      const body = lang === "uk"
+        ? `${pet.name} — ${event.title}`
+        : `${pet.name} — ${event.title}`;
+
+      try {
+        const id = await Notifications.scheduleNotificationAsync({
+          content: {
+            title,
+            body,
+            data: { petId: pet.id, eventId: event.id, type: "health_event" },
+            sound: true,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: fireDate,
+          },
+        });
+        ids.push(id);
+      } catch (e) {
+        if (__DEV__) console.warn("scheduleSeriesNotifications:", e);
+      }
+    }
+  }
+
+  return ids;
+}
+
+/**
+ * Schedule a daily 09:00 reminder if there are any overdue events.
+ * Should be called on every app open. Returns the notification ID or null.
+ */
+export async function scheduleOverdueReminder(
+  hasOverdue: boolean,
+  lang: "uk" | "en" = "uk"
+): Promise<string | null> {
+  if (Platform.OS === "web" || !hasOverdue) return null;
+
+  try {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(9, 0, 0, 0);
+
+    const id = await Notifications.scheduleNotificationAsync({
+      content: {
+        title: lang === "uk" ? "У вас є прострочені події" : "You have overdue events",
+        body: lang === "uk"
+          ? "Перевірте список подій та відмітьте виконані"
+          : "Check your events list and mark completed ones",
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: tomorrow,
+      },
+    });
+    return id;
+  } catch (e) {
+    if (__DEV__) console.warn("scheduleOverdueReminder:", e);
+    return null;
+  }
+}
+
+/**
+ * Refresh all health event notifications for all pets.
+ * Cancels existing notifications and reschedules for the next 3 days.
+ * Should be called on every app open.
+ */
+export async function refreshAllEventNotifications(
+  pets: Pet[],
+  lang: "uk" | "en" = "uk"
+): Promise<void> {
+  if (Platform.OS === "web") return;
+
+  // Cancel all existing scheduled notifications
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  } catch (e) {
+    if (__DEV__) console.warn("refreshAllEventNotifications cancel:", e);
+  }
+
+  const today = getTodayStr();
+  let hasOverdue = false;
+
+  for (const pet of pets) {
+    const anchors = (pet.healthEvents ?? []).filter(
+      e => e.isCurrent === true || (e.isCurrent === undefined && e.status !== "done" && e.status !== "cancelled")
+    );
+
+    for (const anchor of anchors) {
+      if (anchor.status === "overdue" || (anchor.date < today && anchor.status !== "done")) {
+        hasOverdue = true;
+      }
+      try {
+        const ids = await scheduleSeriesNotifications(pet, anchor, lang, 3);
+        // Note: we don't persist these IDs in the new architecture since we refresh on every open
+        void ids;
+      } catch (e) {
+        if (__DEV__) console.warn("refreshAllEventNotifications:", e);
+      }
+    }
+  }
+
+  await scheduleOverdueReminder(hasOverdue, lang);
 }
 
 export function calculateAge(

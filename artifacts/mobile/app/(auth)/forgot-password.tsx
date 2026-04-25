@@ -18,9 +18,11 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 export default function ForgotPasswordScreen() {
   const { forgotPassword } = useAuth();
+  const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ export default function ForgotPasswordScreen() {
 
   const handleSend = async () => {
     if (!email.trim()) {
-      Alert.alert("", "Введіть ваш email");
+      Alert.alert("", t.errorEmail);
       return;
     }
     setLoading(true);
@@ -36,7 +38,7 @@ export default function ForgotPasswordScreen() {
     const { error } = await forgotPassword(email);
     setLoading(false);
     if (error) {
-      Alert.alert("Помилка", error);
+      Alert.alert(t.error, error);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setSent(true);
@@ -55,7 +57,7 @@ export default function ForgotPasswordScreen() {
         <Pressable onPress={() => router.back()} style={styles.backBtn}>
           <MaterialCommunityIcons name="arrow-left" size={22} color="#FFFAF6" />
         </Pressable>
-        <Text style={styles.headerTitle}>Відновлення паролю</Text>
+        <Text style={styles.headerTitle}>{t.forgotPasswordTitle}</Text>
         <View style={{ width: 40 }} />
       </LinearGradient>
 
@@ -67,22 +69,18 @@ export default function ForgotPasswordScreen() {
         {sent ? (
           <Animated.View entering={FadeInDown.delay(40).springify()} style={styles.successCard}>
             <Text style={styles.successEmoji}>📧</Text>
-            <Text style={styles.successTitle}>Лист надіслано!</Text>
-            <Text style={styles.successText}>
-              Перевірте вашу пошту {email} і перейдіть за посиланням для відновлення паролю.
-            </Text>
+            <Text style={styles.successTitle}>{t.forgotPasswordSuccess}</Text>
+            <Text style={styles.successText}>{t.forgotPasswordSuccessText(email)}</Text>
             <Pressable onPress={() => router.back()} style={styles.backToLoginBtn}>
               <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.backToLoginGrad}>
-                <Text style={styles.backToLoginText}>Повернутись до входу</Text>
+                <Text style={styles.backToLoginText}>{t.forgotPasswordBack}</Text>
               </LinearGradient>
             </Pressable>
           </Animated.View>
         ) : (
           <Animated.View entering={FadeInDown.delay(80).springify()} style={styles.content}>
-            <Text style={styles.title}>Забули пароль?</Text>
-            <Text style={styles.subtitle}>
-              Введіть email пов'язаний з вашим акаунтом — ми надішлемо посилання для відновлення.
-            </Text>
+            <Text style={styles.title}>{t.forgotPasswordHeading}</Text>
+            <Text style={styles.subtitle}>{t.forgotPasswordSubtitle}</Text>
 
             <View style={styles.card}>
               <View style={styles.inputGroup}>
@@ -108,12 +106,14 @@ export default function ForgotPasswordScreen() {
 
             <Pressable onPress={handleSend} disabled={loading} style={styles.ctaWrap}>
               <LinearGradient colors={["#E8651A", "#C45215"]} style={styles.cta}>
-                <Text style={styles.ctaText}>{loading ? "Надсилаємо..." : "Надіслати посилання"}</Text>
+                <Text style={styles.ctaText}>
+                  {loading ? t.forgotPasswordSending : t.forgotPasswordBtn}
+                </Text>
               </LinearGradient>
             </Pressable>
 
             <Pressable onPress={() => router.back()} style={styles.backLink}>
-              <Text style={styles.backLinkText}>← Повернутись до входу</Text>
+              <Text style={styles.backLinkText}>← {t.forgotPasswordBack}</Text>
             </Pressable>
           </Animated.View>
         )}

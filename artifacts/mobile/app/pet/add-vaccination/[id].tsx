@@ -45,7 +45,7 @@ const COMMON_VACCINES = [
 export default function AddVaccinationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getPet, addVaccination } = usePets();
-  const { language } = useLanguage();
+  const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
 
@@ -66,14 +66,14 @@ export default function AddVaccinationScreen() {
       headerLeft: () => (
         <Pressable onPress={() => router.back()} style={{ marginLeft: 4 }}>
           <Text style={{ fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary }}>
-            {language === "uk" ? "Скасувати" : "Cancel"}
+            {t.cancel}
           </Text>
         </Pressable>
       ),
       headerRight: () => (
         <Pressable onPress={handleSave} style={{ marginRight: 4 }}>
           <Text style={{ fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.primary }}>
-            {language === "uk" ? "Зберегти" : "Save"}
+            {t.done}
           </Text>
         </Pressable>
       ),
@@ -86,15 +86,15 @@ export default function AddVaccinationScreen() {
 
   const handleSave = async () => {
     if (!form.name.trim()) {
-      Alert.alert("Помилка", "Вкажіть назву вакцини");
+      Alert.alert(t.error, t.errorVaccineName);
       return;
     }
     if (!form.date.trim()) {
-      Alert.alert("Помилка", "Вкажіть дату вакцинації");
+      Alert.alert(t.error, t.errorVaccineDate);
       return;
     }
     if (!form.nextDate.trim()) {
-      Alert.alert("Помилка", "Вкажіть дату наступної вакцинації");
+      Alert.alert(t.error, t.errorVaccineNextDate);
       return;
     }
 
@@ -143,7 +143,7 @@ export default function AddVaccinationScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Швидкий вибір</Text>
+          <Text style={styles.sectionTitle}>{t.quickPick}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipsScroll}>
             <View style={styles.chips}>
               {COMMON_VACCINES.map((name) => (
@@ -168,37 +168,37 @@ export default function AddVaccinationScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Інформація про вакцинацію</Text>
+          <Text style={styles.sectionTitle}>{t.vaccinationInfo}</Text>
           <View style={styles.card}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Назва вакцини *</Text>
+              <Text style={styles.inputLabel}>{t.vaccineName} *</Text>
               <TextInput
                 style={styles.input}
                 value={form.name}
                 onChangeText={(v) => updateForm("name", v)}
-                placeholder="Назва вакцини"
+                placeholder={t.vaccineName}
                 placeholderTextColor={Colors.textTertiary}
               />
             </View>
             <View style={styles.divider} />
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Дата вакцинації *</Text>
+              <Text style={styles.inputLabel}>{t.vaccineDate} *</Text>
               <DatePickerField
                 value={form.date}
                 onChange={(iso) => updateForm("date", iso)}
-                placeholder={language === "uk" ? "Оберіть дату вакцинації" : "Select vaccination date"}
-                label={language === "uk" ? "Дата вакцинації" : "Vaccination Date"}
+                placeholder={t.vaccineDate}
+                label={t.vaccineDate}
                 maximumDate={new Date()}
               />
             </View>
             <View style={styles.divider} />
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Наступна вакцинація *</Text>
+              <Text style={styles.inputLabel}>{t.nextVaccineDate} *</Text>
               <DatePickerField
                 value={form.nextDate}
                 onChange={(iso) => updateForm("nextDate", iso)}
-                placeholder={language === "uk" ? "Оберіть дату наступної вакцинації" : "Select next vaccination date"}
-                label={language === "uk" ? "Наступна вакцинація" : "Next Vaccination"}
+                placeholder={t.nextVaccineDate}
+                label={t.nextVaccineDate}
                 minimumDate={new Date()}
               />
             </View>
@@ -206,26 +206,26 @@ export default function AddVaccinationScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Додаткова інформація</Text>
+          <Text style={styles.sectionTitle}>{t.additionalInfo}</Text>
           <View style={styles.card}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Ветеринар</Text>
+              <Text style={styles.inputLabel}>{t.vet}</Text>
               <TextInput
                 style={styles.input}
                 value={form.vetName}
                 onChangeText={(v) => updateForm("vetName", v)}
-                placeholder="Ім'я ветеринара"
+                placeholder={t.vetNamePlaceholder}
                 placeholderTextColor={Colors.textTertiary}
               />
             </View>
             <View style={styles.divider} />
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Нотатки</Text>
+              <Text style={styles.inputLabel}>{t.notes}</Text>
               <TextInput
                 style={[styles.input, styles.multilineInput]}
                 value={form.notes}
                 onChangeText={(v) => updateForm("notes", v)}
-                placeholder="Додаткові нотатки..."
+                placeholder={t.notesPlaceholder}
                 placeholderTextColor={Colors.textTertiary}
                 multiline
                 numberOfLines={3}
@@ -236,9 +236,7 @@ export default function AddVaccinationScreen() {
 
         <View style={styles.notificationNote}>
           <MaterialCommunityIcons name="bell-outline" size={16} color={Colors.primary} />
-          <Text style={styles.notificationNoteText}>
-            Ви отримаєте нагадування за 7 днів до наступної вакцинації
-          </Text>
+          <Text style={styles.notificationNoteText}>{t.vaccineReminder}</Text>
         </View>
 
         <Pressable
@@ -247,7 +245,7 @@ export default function AddVaccinationScreen() {
           style={[styles.saveButton, loading && styles.saveButtonDisabled]}
         >
           <Text style={styles.saveButtonText}>
-            {loading ? "Збереження..." : "Зберегти вакцинацію"}
+            {loading ? t.saving : t.saveVaccination}
           </Text>
         </Pressable>
       </ScrollView>

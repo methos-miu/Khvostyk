@@ -149,6 +149,11 @@ export default function WeightScreen() {
   useLayoutEffect(() => {
     navigation.setOptions({
       title: language === "uk" ? `Вага • ${pet?.name}` : `Weight • ${pet?.name}`,
+      headerLeft: () => (
+        <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); router.back(); }} style={{ marginLeft: 4 }}>
+          <MaterialCommunityIcons name="chevron-left" size={28} color={Colors.primary} />
+        </Pressable>
+      ),
       headerRight: () => (
         <Pressable onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowPicker(true); }} style={{ marginRight: 0 }}>
           <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: Colors.surface, alignItems: "center", justifyContent: "center" }}>
@@ -425,6 +430,7 @@ const styles = StyleSheet.create({
   content: { padding: 16 },
   chartCard: {
     backgroundColor: Colors.surface, borderRadius: 20, padding: 16, marginBottom: 20,
+    borderWidth: 1, borderColor: Colors.border,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 14, elevation: 4,
   },
   chartTitle: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text, marginBottom: 12 },
@@ -450,6 +456,7 @@ const styles = StyleSheet.create({
   entryCard: {
     backgroundColor: Colors.surface, borderRadius: 16, padding: 14,
     flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 10,
+    borderWidth: 1, borderColor: Colors.border,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 1, shadowRadius: 8, elevation: 3,
   },
   entryIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: Colors.primaryLight, alignItems: "center", justifyContent: "center" },
@@ -460,6 +467,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderWidth: 1, borderColor: Colors.border,
   },
   handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
   modalHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.border },

@@ -1,7 +1,31 @@
 {
   "permissions": {
     "allow": [
-      "Bash(find /home/runner/workspace/artifacts/mobile -not -path */node_modules/* -type f)"
+      "Bash(find /home/runner/workspace/artifacts/mobile -not -path */node_modules/* -type f)",
+      "Bash(node:*)",
+      "Bash(wc:*)",
+      "Bash(find /home/runner/workspace/artifacts/mobile -not -path */node_modules/* -type f -name *.tsx -o -type f -name *.ts -o -type f -name *.json)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -v \"^$\")",
+      "Bash(grep -n \"health-events\\\\|add-health-event\\\\|healthEvents\\\\|upcomingHealthEvents\" /home/runner/workspace/artifacts/mobile/app/pet/[id].tsx)",
+      "Bash(find:*)",
+      "Bash(grep -n \"backgroundColor\\\\|shadowColor\\\\|borderWidth\\\\|card\\\\|sheet\\\\|block\\\\|modal\" /home/runner/workspace/artifacts/mobile/app/pet/weight/[id].tsx)",
+      "Bash(tail:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Read(//tmp/**)",
+      "Bash(npx supabase:*)",
+      "Bash(env)",
+      "Bash(xargs ls:*)",
+      "Bash(pnpm typecheck:*)",
+      "Bash(pnpm install:*)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_42bdb02978e38477855abf24d57926e89b4350d1 npx supabase db push --linked)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_42bdb02978e38477855abf24d57926e89b4350d1 npx supabase migration list --linked)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_42bdb02978e38477855abf24d57926e89b4350d1 npx supabase db push --project-ref kbjndjxjgesybouimdny)",
+      "Bash(curl *)",
+      "Read(//home/runner/.config/**)",
+      "Read(//home/runner/.config/supabase/**)",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_42bdb02978e38477855abf24d57926e89b4350d1 npx supabase projects list)"
     ]
   }
 }

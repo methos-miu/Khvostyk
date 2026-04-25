@@ -128,23 +128,15 @@ function RootLayoutNav() {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen
           name="pet/[id]"
-          options={{ title: t.profile, headerBackTitle: t.back }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="pet/add"
           options={{ headerShown: false, presentation: "modal" }}
         />
         <Stack.Screen
-          name="pet/vaccinations/[id]"
-          options={{ title: t.vaccinations, headerBackTitle: t.back }}
-        />
-        <Stack.Screen
           name="pet/documents/[id]"
           options={{ title: t.documents, headerBackTitle: t.back }}
-        />
-        <Stack.Screen
-          name="pet/add-vaccination/[id]"
-          options={{ title: t.addVaccination, presentation: "modal", headerBackTitle: t.cancel }}
         />
         <Stack.Screen
           name="pet/edit/[id]"
@@ -156,8 +148,36 @@ function RootLayoutNav() {
         <Stack.Screen
           name="pet/weight/[id]"
           options={{
-            title: language === "uk" ? "Журнал ваги" : "Weight Log",
+            title: t.weightLog,
             headerBackTitle: t.back,
+          }}
+        />
+        <Stack.Screen
+          name="pet/health-events/index"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="pet/select-event-template/[id]"
+          options={{
+            headerShown: false,
+          }}
+        />
+        <Stack.Screen
+          name="pet/create-custom-template/[id]"
+          options={{
+            title: language === "uk" ? "Новий шаблон" : "New Template",
+            presentation: "modal",
+            headerBackTitle: t.cancel,
+          }}
+        />
+        <Stack.Screen
+          name="pet/add-health-event/[id]"
+          options={{
+            title: t.addHealthEvent,
+            presentation: "modal",
+            headerBackTitle: t.cancel,
           }}
         />
       </Stack>

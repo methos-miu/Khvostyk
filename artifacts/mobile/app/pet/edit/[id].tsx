@@ -91,7 +91,7 @@ function getBreedList(species: Species, lang: "uk" | "en"): string[] {
 
 export default function EditPetScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getPet, updatePet, addWeightEntry, updateWeightEntry } = usePets();
+  const { getPet, updatePet, addWeightEntry, updateWeightEntry, upsertBirthdayEvent } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -324,6 +324,12 @@ export default function EditPetScreen() {
         } else {
           await addWeightEntry(pet.id, { date: todayIso, weight: parseFloat(form.weight.trim()) });
         }
+      }
+      // Auto-upsert birthday event when birthdate is newly set or changed
+      const originalBirthdate = pet.birthdate ?? "";
+      if (form.birthdate && form.birthdate !== originalBirthdate) {
+        const bdTitle = language === "uk" ? "День народження" : "Birthday";
+        await upsertBirthdayEvent(pet.id, form.birthdate, bdTitle);
       }
       router.back();
     } finally {
@@ -845,6 +851,7 @@ const styles = StyleSheet.create({
   genderLabelActive: { color: Colors.textLight },
   card: {
     backgroundColor: Colors.surface, borderRadius: 18, overflow: "hidden",
+    borderWidth: 1, borderColor: Colors.border,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1, shadowRadius: 12, elevation: 3,
   },
@@ -864,7 +871,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: "flex-end" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    maxHeight: "70%",
+    borderWidth: 1, borderColor: Colors.border, maxHeight: "70%",
   },
   weightModalSheet: { maxHeight: "55%" },
   handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },

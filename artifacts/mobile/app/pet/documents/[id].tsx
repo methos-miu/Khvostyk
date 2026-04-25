@@ -710,6 +710,7 @@ const styles = StyleSheet.create({
   documentCard: {
     backgroundColor: Colors.surface, borderRadius: 18, marginBottom: 10,
     flexDirection: "row", alignItems: "center", padding: 12, gap: 12,
+    borderWidth: 1, borderColor: Colors.border,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 1, shadowRadius: 14, elevation: 4,
   },
   docThumbnail: { width: 62, height: 62, borderRadius: 12 },
@@ -741,6 +742,7 @@ const styles = StyleSheet.create({
   addModalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
   addModalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    borderWidth: 1, borderColor: Colors.border,
     paddingHorizontal: 16, paddingTop: 8, maxHeight: "90%",
   },
   handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },

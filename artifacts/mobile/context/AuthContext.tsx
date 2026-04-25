@@ -45,11 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       else setIsLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) fetchProfile(session.user.id);
-      else { setProfile(null); setIsLoading(false); }
+      if (session?.user) {
+        fetchProfile(session.user.id);
+      } else {
+        setProfile(null);
+        setIsLoading(false);
+        // TOKEN_REFRESHED with no session means the refresh token expired
+        if (event === "TOKEN_REFRESHED" && !session) {
+          supabase.auth.signOut().catch(() => {});
+        }
+      }
     });
 
     return () => subscription.unsubscribe();

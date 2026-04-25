@@ -76,7 +76,7 @@ export default function WelcomeScreen() {
             <Text style={styles.btnSecondaryText}>{language === "uk" ? "Вже є акаунт? Увійти" : "Already have an account? Sign In"}</Text>
           </Pressable>
 
-          <SocialAuthButtons language={language} />
+          <SocialAuthButtons />
         </Animated.View>
       </ScrollView>
     </View>

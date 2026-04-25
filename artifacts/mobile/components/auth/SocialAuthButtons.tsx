@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "@/context/AuthContext";
+import { useLanguage } from "@/context/LanguageContext";
 
 function GoogleIcon() {
   return (
@@ -41,11 +42,11 @@ const icon = StyleSheet.create({
 
 interface Props {
   showApple?: boolean;
-  language?: string;
 }
 
-export default function SocialAuthButtons({ showApple = true, language = "uk" }: Props) {
+export default function SocialAuthButtons({ showApple = true }: Props) {
   const { signInWithProvider, signInWithApple } = useAuth();
+  const { t, language } = useLanguage();
   const [loadingProvider, setLoadingProvider] = useState<string | null>(null);
 
   const handleProvider = async (provider: "google" | "facebook") => {
@@ -53,10 +54,7 @@ export default function SocialAuthButtons({ showApple = true, language = "uk" }:
     const { error } = await signInWithProvider(provider);
     setLoadingProvider(null);
     if (error && error !== "cancelled") {
-      Alert.alert(
-        "Помилка входу",
-        translateProviderError(error, provider),
-      );
+      Alert.alert(t.loginError, translateProviderError(error, provider, t, language));
     }
   };
 
@@ -65,7 +63,7 @@ export default function SocialAuthButtons({ showApple = true, language = "uk" }:
     const { error } = await signInWithApple();
     setLoadingProvider(null);
     if (error && error !== "cancelled") {
-      Alert.alert("Помилка входу", error);
+      Alert.alert(t.loginError, error);
     }
   };
 
@@ -89,7 +87,9 @@ export default function SocialAuthButtons({ showApple = true, language = "uk" }:
         ) : (
           <GoogleIcon />
         )}
-        <Text style={styles.btnText}>{language === "uk" ? "Увійти через Google" : "Sign in with Google"}</Text>
+        <Text style={styles.btnText}>
+          {language === "uk" ? "Увійти через Google" : "Sign in with Google"}
+        </Text>
       </Pressable>
 
       <Pressable
@@ -102,7 +102,9 @@ export default function SocialAuthButtons({ showApple = true, language = "uk" }:
         ) : (
           <FacebookIcon />
         )}
-        <Text style={[styles.btnText, styles.facebookText]}>{language === "uk" ? "Увійти через Facebook" : "Sign in with Facebook"}</Text>
+        <Text style={[styles.btnText, styles.facebookText]}>
+          {language === "uk" ? "Увійти через Facebook" : "Sign in with Facebook"}
+        </Text>
       </Pressable>
 
       {showApple && isIOS && (
@@ -116,19 +118,24 @@ export default function SocialAuthButtons({ showApple = true, language = "uk" }:
           ) : (
             <AppleIcon />
           )}
-          <Text style={[styles.btnText, styles.appleText]}>Sign in with Apple</Text>
+          <Text style={[styles.btnText, styles.appleText]}>{t.signInWithApple}</Text>
         </Pressable>
       )}
     </View>
   );
 }
 
-function translateProviderError(error: string, provider: string): string {
+function translateProviderError(
+  error: string,
+  provider: string,
+  t: ReturnType<typeof useLanguage>["t"],
+  language: string
+): string {
   if (error.includes("provider is not enabled")) {
     const name = provider === "google" ? "Google" : "Facebook";
-    return `${name} вхід ще не налаштовано. Зверніться до адміністратора.`;
+    return t.providerNotEnabled(name);
   }
-  if (error.includes("network")) return "Помилка мережі. Перевірте підключення.";
+  if (error.includes("network")) return t.networkError;
   return error;
 }
 

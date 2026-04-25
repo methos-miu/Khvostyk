@@ -146,14 +146,14 @@ export default function SettingsScreen() {
         colors={[Colors.gradientStart, Colors.gradientEnd]}
         style={[styles.header, { paddingTop: topInset + 12 }]}
       >
-        <Animated.View entering={FadeInUp.delay(100)}>
+        <Animated.View entering={FadeInUp.delay(100)} style={styles.headerContent}>
           <Text style={styles.headerTitle}>{t.settings}</Text>
-          <Text style={styles.headerSubtitle}>{t.appName}</Text>
         </Animated.View>
       </LinearGradient>
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: Platform.OS === "web" ? 100 : 80 }]}
+        directionalLockEnabled={true}
         showsVerticalScrollIndicator={false}
       >
 
@@ -337,9 +337,9 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
-  header: { paddingHorizontal: 20, paddingBottom: 24 },
-  headerTitle: { fontSize: 26, fontFamily: "Inter_700Bold", color: Colors.textLight },
-  headerSubtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: "rgba(255,255,255,0.75)", marginTop: 2 },
+  header: { paddingHorizontal: 20, paddingBottom: 20 },
+  headerContent: { alignItems: "center", minHeight: 46, justifyContent: "center" },
+  headerTitle: { fontSize: 22, fontFamily: "Inter_700Bold", color: Colors.textLight, textAlign: "center" },
   content: { padding: 16, paddingTop: 20, gap: 6 },
   sectionLabel: {
     fontSize: 12, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary,

@@ -90,7 +90,7 @@ function getBreedList(species: Species, lang: "uk" | "en"): string[] {
 }
 
 export default function AddPetScreen() {
-  const { addPet } = usePets();
+  const { addPet, upsertBirthdayEvent } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(false);
@@ -200,7 +200,7 @@ export default function AddPetScreen() {
           }
         }
       }
-      await addPet({
+      const newPet = await addPet({
         name: form.name.trim(),
         species: form.species,
         customSpecies: form.species === "other" ? form.customSpecies.trim() : undefined,
@@ -215,6 +215,10 @@ export default function AddPetScreen() {
         personality: form.personality.trim() || undefined,
         description: form.description.trim() || undefined,
       });
+      if (form.birthdate) {
+        const bdTitle = language === "uk" ? "День народження" : "Birthday";
+        await upsertBirthdayEvent(newPet.id, form.birthdate, bdTitle);
+      }
       router.back();
     } finally {
       setLoading(false);
@@ -843,6 +847,7 @@ const styles = StyleSheet.create({
   genderLabelActive: { color: Colors.textLight },
   card: {
     backgroundColor: Colors.surface, borderRadius: 18, overflow: "hidden",
+    borderWidth: 1, borderColor: Colors.border,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 1, shadowRadius: 12, elevation: 3,
   },
@@ -862,7 +867,7 @@ const styles = StyleSheet.create({
   modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.4)" },
   modalSheet: {
     backgroundColor: Colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    maxHeight: "70%",
+    borderWidth: 1, borderColor: Colors.border, maxHeight: "70%",
   },
   weightModalSheet: { maxHeight: "55%" },
   handleWrap: { paddingTop: 12, paddingBottom: 4, alignItems: "center" },
