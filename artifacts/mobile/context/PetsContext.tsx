@@ -1397,6 +1397,26 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       const pet = currentPets.find(p => p.id === petId);
       const event = pet?.healthEvents?.find(e => e.id === eventId);
       if (!pet || !event) return;
+      const today = seriesGetToday();
+
+      // Backdated completion: only mark this record as done.
+      // Do not create a new occurrence in the past.
+      if (event.date < today) {
+        const doneEvent: HealthEvent = { ...event, status: "done", isCurrent: false };
+        const newHealthEvents = (pet.healthEvents ?? []).map(e => e.id === eventId ? doneEvent : e);
+        const updated = currentPets.map(p =>
+          p.id === petId ? { ...p, healthEvents: newHealthEvents } : p
+        );
+        setPets(updated);
+        petsRef.current = updated;
+        await savePets(updated);
+
+        supabase.from("health_events")
+          .update({ status: "done", is_current: false })
+          .eq("id", eventId)
+          .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (past):", error.message); });
+        return;
+      }
 
       // Guard against double-tap
       const alreadyExists = pet.healthEvents?.some(
