@@ -399,8 +399,11 @@ export function getDisplayEvents(
   const allVirtual: HealthEvent[] = [];
 
   for (const [, records] of seriesMap) {
-    // Find the rule-defining record: any record with rrule set
-    const ruleDef = records.find(e => e.rrule && e.rrule.length > 0);
+    // Prefer an explicit rrule owner, but gracefully fall back to legacy
+    // interval fields if local state temporarily has no rrule on the anchor.
+    const ruleDef =
+      records.find(e => e.rrule && e.rrule.length > 0) ??
+      records.find(e => !!getSeriesInterval(e));
     if (!ruleDef) continue;
 
     // Latest real date in this series — start generation from here
