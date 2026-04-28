@@ -446,6 +446,7 @@ export default function HealthEventsScreen() {
           eventTimesPerCycle: String(event.timesPerCycle ?? 1),
           eventCycleSlots: event.cycleSlots?.length ? JSON.stringify(event.cycleSlots) : "",
           eventSeriesId: event.seriesId ?? "",
+          eventRrule: event.rrule ?? "",
           editScope: scope,
           eventExtraFields: event.extraFields && Object.keys(event.extraFields).length > 0
             ? JSON.stringify(event.extraFields) : "",

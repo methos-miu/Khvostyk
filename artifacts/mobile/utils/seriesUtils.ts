@@ -11,6 +11,18 @@
 import { RRule } from "rrule";
 import type { HealthEvent, HealthEventStatus, CycleSlot } from "@/context/PetsContext";
 
+export type WeekdayCode = "MO" | "TU" | "WE" | "TH" | "FR" | "SA" | "SU";
+
+const WEEKDAY_CODE_TO_RRULE = {
+  MO: RRule.MO,
+  TU: RRule.TU,
+  WE: RRule.WE,
+  TH: RRule.TH,
+  FR: RRule.FR,
+  SA: RRule.SA,
+  SU: RRule.SU,
+} as const;
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 export function getTodayStr(): string {
@@ -94,15 +106,21 @@ export function buildRruleString(
   value: number,
   unit: "day" | "week" | "month" | "year",
   endDate?: string,
-  afterCompletion?: boolean
+  afterCompletion?: boolean,
+  options?: { startDate?: string; byWeekdays?: WeekdayCode[] }
 ): string {
   const freqMap: Record<string, string> = {
     day: "DAILY", week: "WEEKLY", month: "MONTHLY", year: "YEARLY",
   };
   let rrule = `FREQ=${freqMap[unit] ?? "DAILY"}`;
   if (value > 1) rrule += `;INTERVAL=${value}`;
+  if (unit === "week" && options?.byWeekdays?.length) {
+    const unique = [...new Set(options.byWeekdays)];
+    rrule += `;BYDAY=${unique.join(",")}`;
+  }
   if (endDate) rrule += `;UNTIL=${endDate.replace(/-/g, "")}T000000Z`;
   if (afterCompletion) rrule += ";X-AFTER-COMPLETION=TRUE";
+  if (options?.startDate) rrule += `;X-ANCHOR=${options.startDate.replace(/-/g, "")}`;
   return rrule;
 }
 
@@ -127,18 +145,98 @@ function getIntervalFromRrule(rruleStr: string): SeriesInterval | null {
   return unit ? { value: interval, unit } : null;
 }
 
+function getCustomFlag(rruleStr: string, flag: string): string | undefined {
+  const m = rruleStr.match(new RegExp(`${flag}=([^;]+)`));
+  return m?.[1];
+}
+
+function parseAnchorDate(rruleStr: string): string | undefined {
+  const raw = getCustomFlag(rruleStr, "X-ANCHOR");
+  if (!raw || !/^\d{8}$/.test(raw)) return undefined;
+  return `${raw.slice(0, 4)}-${raw.slice(4, 6)}-${raw.slice(6, 8)}`;
+}
+
+export function getWeekdaysFromRrule(rruleStr?: string): WeekdayCode[] {
+  if (!rruleStr) return [];
+  const m = rruleStr.match(/BYDAY=([A-Z,]+)/);
+  if (!m) return [];
+  return m[1]
+    .split(",")
+    .filter((d): d is WeekdayCode => d in WEEKDAY_CODE_TO_RRULE);
+}
+
+export function weekdayCodeForDate(dateStr: string): WeekdayCode {
+  const d = dateStrToDate(dateStr).getDay();
+  return (["SU", "MO", "TU", "WE", "TH", "FR", "SA"] as WeekdayCode[])[d];
+}
+
+
+function parseFreq(rruleStr: string): "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | null {
+  const m = rruleStr.match(/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)/);
+  return (m?.[1] as "DAILY" | "WEEKLY" | "MONTHLY" | "YEARLY" | undefined) ?? null;
+}
+
+function parseInterval(rruleStr: string): number {
+  const m = rruleStr.match(/INTERVAL=(\d+)/);
+  const val = m ? parseInt(m[1], 10) : 1;
+  return Number.isFinite(val) && val > 0 ? val : 1;
+}
+
+function daysInMonth(year: number, month1: number): number {
+  return new Date(year, month1, 0).getDate();
+}
+
+function addMonthsClamped(anchorDate: string, monthsToAdd: number): string {
+  const [y, m, d] = anchorDate.split("-").map(Number);
+  const totalMonths = (m - 1) + monthsToAdd;
+  const year = y + Math.floor(totalMonths / 12);
+  const month = (totalMonths % 12 + 12) % 12 + 1;
+  const day = Math.min(d, daysInMonth(year, month));
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function addYearsClamped(anchorDate: string, yearsToAdd: number): string {
+  const [y, m, d] = anchorDate.split("-").map(Number);
+  const year = y + yearsToAdd;
+  const day = Math.min(d, daysInMonth(year, m));
+  return `${year}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 /**
  * Get the next occurrence strictly after currentDateStr using an rrule string.
  * The rrule start (dtstart) is set to currentDateStr.
  * Returns undefined if the series has ended.
  */
 export function getNextOccurrenceAfter(rruleStr: string, currentDateStr: string): string | undefined {
-  const dtstart = dateStrToUTC(currentDateStr);
   const cleanStr = stripCustomFlags(rruleStr);
+  const anchorDate = parseAnchorDate(rruleStr) ?? currentDateStr;
+  const freq = parseFreq(cleanStr);
+  const interval = parseInterval(cleanStr);
+
+  if (!freq) return undefined;
+
+  if (freq === "MONTHLY") {
+    for (let i = 1; i <= 2400; i++) {
+      const candidate = addMonthsClamped(anchorDate, i * interval);
+      if (candidate > currentDateStr) return candidate;
+    }
+    return undefined;
+  }
+
+  if (freq === "YEARLY") {
+    for (let i = 1; i <= 500; i++) {
+      const candidate = addYearsClamped(anchorDate, i * interval);
+      if (candidate > currentDateStr) return candidate;
+    }
+    return undefined;
+  }
+
+  const dtstart = dateStrToUTC(anchorDate);
+  const currentDate = dateStrToUTC(currentDateStr);
   try {
     const options = RRule.parseString(cleanStr);
     const rule = new RRule({ ...options, dtstart });
-    const next = rule.after(dtstart, false);
+    const next = rule.after(currentDate, false);
     return next ? utcDateToStr(next) : undefined;
   } catch {
     return undefined;
@@ -297,29 +395,22 @@ export function generateSeriesEvents(
 
   // ── New rrule-based path ──────────────────────────────────────────────────
   if (anchor.rrule && anchor.recurrenceType !== "one_time") {
-    const dtstart = dateStrToUTC(anchor.date);
-    const endDate = dateStrToUTC(limit);
-    const cleanStr = stripCustomFlags(anchor.rrule);
-
-    let dates: Date[];
-    try {
-      const options = RRule.parseString(cleanStr);
-      const rule = new RRule({ ...options, dtstart });
-      // inclusive=true includes anchor.date itself — we exclude it because
-      // the rule record is already shown directly in the list
-      dates = rule.between(dtstart, endDate, true).filter(d => utcDateToStr(d) !== anchor.date);
-    } catch {
-      return [anchor];
-    }
-
     // Exception lookup: by recurrenceId (new) or by date (legacy isModified)
     const exceptionByDate = new Map<string, HealthEvent>();
     for (const e of exceptions) {
       exceptionByDate.set(e.recurrenceId ?? e.date, e);
     }
 
-    return dates.map((date) => {
-      const dateStr = utcDateToStr(date);
+    const dates: string[] = [];
+    let cursor = anchor.date;
+    while (true) {
+      const next = getNextOccurrenceAfter(anchor.rrule, cursor);
+      if (!next || next > limit) break;
+      dates.push(next);
+      cursor = next;
+    }
+
+    return dates.map((dateStr) => {
       const exception = exceptionByDate.get(dateStr);
       if (exception) return exception;
       if (dateStr === anchor.date) return anchor;
