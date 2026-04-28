@@ -40,12 +40,16 @@ import {
   intervalLabel,
 } from "@/utils/healthEvents";
 import {
+  buildRruleString,
   defaultSlotsForCount,
+  getWeekdaysFromRrule,
   ordinalSlotName,
   SINGLE_SLOT_OPTIONS,
   slotsToStorage,
   storageToSlots,
-  SlotConfig,
+  weekdayCodeForDate,
+  type SlotConfig,
+  type WeekdayCode,
 } from "@/utils/seriesUtils";
 
 // ─── Interval unit options ────────────────────────────────────────────────────
@@ -55,6 +59,16 @@ const UNIT_OPTIONS: { unit: "day" | "week" | "month" | "year"; uk: string; en: s
   { unit: "week",  uk: "тижнів", en: "weeks"  },
   { unit: "month", uk: "міс.",   en: "months" },
   { unit: "year",  uk: "р.",     en: "years"  },
+];
+
+const WEEKDAY_OPTIONS: { code: WeekdayCode; uk: string; en: string }[] = [
+  { code: "MO", uk: "Пн", en: "Mon" },
+  { code: "TU", uk: "Вт", en: "Tue" },
+  { code: "WE", uk: "Ср", en: "Wed" },
+  { code: "TH", uk: "Чт", en: "Thu" },
+  { code: "FR", uk: "Пт", en: "Fri" },
+  { code: "SA", uk: "Сб", en: "Sat" },
+  { code: "SU", uk: "Нд", en: "Sun" },
 ];
 
 // ─── Resolve template ─────────────────────────────────────────────────────────
@@ -322,6 +336,7 @@ export default function AddHealthEventScreen() {
     eventTimesPerCycle,
     eventCycleSlots,
     eventSeriesId,
+    eventRrule,
     editScope,
   } = useLocalSearchParams<{
     id: string;
@@ -349,6 +364,7 @@ export default function AddHealthEventScreen() {
     eventTimesPerCycle?: string;
     eventCycleSlots?: string;
     eventSeriesId?: string;
+    eventRrule?: string;
     editScope?: string; // "this" | "future"
   }>();
 
@@ -399,6 +415,14 @@ export default function AddHealthEventScreen() {
   const [intervalValue, setIntervalValue] = useState(String(initIntervalValue));
   const [intervalUnit, setIntervalUnit] = useState<"day"|"week"|"month"|"year">(initIntervalUnit);
   const [repeatEndDate, setRepeatEndDate] = useState(eventRepeatEndDate || "");
+
+  const initWeeklyDays = useMemo<WeekdayCode[]>(() => {
+    const fromRule = getWeekdaysFromRrule(eventRrule);
+    if (fromRule.length > 0) return fromRule;
+    const baseDate = eventDate || date;
+    return baseDate ? [weekdayCodeForDate(baseDate)] : ["MO"];
+  }, [eventRrule, eventDate, date]);
+  const [weeklyDays, setWeeklyDays] = useState<WeekdayCode[]>(initWeeklyDays);
 
   // Times per day / slots
   const initTimesPerCycle = eventTimesPerCycle ? Number(eventTimesPerCycle) : 1;
@@ -460,7 +484,7 @@ export default function AddHealthEventScreen() {
       ),
     });
   }, [navigation, saving, title, date, birthDate, template, notes, photos, slots, timesPerCycle,
-      repeatOn, intervalValue, intervalUnit, repeatEndDate, extraFields, isEditMode, lang]);
+      repeatOn, intervalValue, intervalUnit, repeatEndDate, weeklyDays, extraFields, isEditMode, lang]);
 
   if (!pet) {
     return <View style={styles.notFound}><Text style={styles.notFoundText}>{t.notFound}</Text></View>;
@@ -507,6 +531,13 @@ export default function AddHealthEventScreen() {
       const resolvedIntervalValue = repeatOn ? Math.max(1, parseInt(intervalValue, 10) || 1) : undefined;
       const resolvedIntervalUnit = repeatOn ? intervalUnit : undefined;
       const resolvedRepeatRule: "yearly" | undefined = isYearlyFixed ? "yearly" : undefined;
+      const normalizedWeeklyDays = Array.from(new Set(weeklyDays));
+      const resolvedRrule = (repeatOn && resolvedIntervalValue && resolvedIntervalUnit)
+        ? buildRruleString(resolvedIntervalValue, resolvedIntervalUnit, repeatEndDate || undefined, false, {
+            startDate: date,
+            byWeekdays: resolvedIntervalUnit === "week" ? normalizedWeeklyDays : undefined,
+          })
+        : undefined;
 
       const cycleSlotsFinal: CycleSlot[] = slotsToStorage(slots);
 
@@ -519,6 +550,7 @@ export default function AddHealthEventScreen() {
         repeatIntervalUnit: resolvedIntervalUnit,
         repeatEndDate: repeatEndDate || undefined,
         repeatRule: resolvedRepeatRule,
+        rrule: resolvedRrule,
         timesPerCycle,
         cycleSlots: cycleSlotsFinal,
         notes: notes.trim() || undefined,
@@ -640,7 +672,7 @@ export default function AddHealthEventScreen() {
                       <Pressable
                         key={u.unit}
                         style={[styles.unitChip, intervalUnit === u.unit && styles.unitChipActive]}
-                        onPress={() => { Haptics.selectionAsync(); setIntervalUnit(u.unit); }}
+                        onPress={() => { Haptics.selectionAsync(); setIntervalUnit(u.unit); if (u.unit === "week" && weeklyDays.length === 0) setWeeklyDays([date ? weekdayCodeForDate(date) : "MO"]); }}
                       >
                         <Text style={[styles.unitChipText, intervalUnit === u.unit && styles.unitChipTextActive]}>
                           {lang === "uk" ? u.uk : u.en}
@@ -667,6 +699,36 @@ export default function AddHealthEventScreen() {
                         : `Recommended: ${intervalLabel(smartDefault.value, smartDefault.unit, "en")} — tap to apply`}
                     </Text>
                   </Pressable>
+                )}
+
+                {intervalUnit === "week" && (
+                  <View style={styles.field}>
+                    <Text style={styles.label}>{lang === "uk" ? "Дні тижня" : "Weekdays"}</Text>
+                    <View style={styles.unitRow}>
+                      {WEEKDAY_OPTIONS.map((day) => {
+                        const active = weeklyDays.includes(day.code);
+                        return (
+                          <Pressable
+                            key={day.code}
+                            style={[styles.unitChip, active && styles.unitChipActive]}
+                            onPress={() => {
+                              Haptics.selectionAsync();
+                              setWeeklyDays(prev => {
+                                if (prev.includes(day.code)) {
+                                  return prev.length > 1 ? prev.filter(d => d !== day.code) : prev;
+                                }
+                                return [...prev, day.code];
+                              });
+                            }}
+                          >
+                            <Text style={[styles.unitChipText, active && styles.unitChipTextActive]}>
+                              {lang === "uk" ? day.uk : day.en}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
                 )}
 
                 {/* Repeat until */}

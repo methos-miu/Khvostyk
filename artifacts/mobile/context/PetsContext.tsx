@@ -16,6 +16,7 @@ import {
   buildRruleString,
   getNextOccurrenceAfter,
   getDisplayEvents,
+  getWeekdaysFromRrule,
 } from "@/utils/seriesUtils";
 
 export type Species =
@@ -343,8 +344,8 @@ function migratePet(raw: any): Pet {
         if (recurrenceType !== "regular") return undefined;
         const iv = e.repeatIntervalValue as number | undefined;
         const iu = e.repeatIntervalUnit as "day" | "week" | "month" | "year" | undefined;
-        if (iv && iu) return buildRruleString(iv, iu, e.repeatEndDate ?? undefined);
-        if (e.repeatIntervalDays) return buildRruleString(e.repeatIntervalDays as number, "day");
+        if (iv && iu) return buildRruleString(iv, iu, e.repeatEndDate ?? undefined, false, { startDate: e.date });
+        if (e.repeatIntervalDays) return buildRruleString(e.repeatIntervalDays as number, "day", undefined, false, { startDate: e.date });
         if (repeatRule === "yearly" || e.type === "birthday" || e.type === "family_day") return "FREQ=YEARLY";
         return undefined;
       })();
@@ -450,8 +451,8 @@ function assemblePets(
           if (recurrenceType !== "regular") return undefined;
           const iv = e.repeat_interval_value as number | undefined;
           const iu = e.repeat_interval_unit as "day" | "week" | "month" | "year" | undefined;
-          if (iv && iu) return buildRruleString(iv, iu, e.repeat_end_date ?? undefined);
-          if (e.repeat_interval_days) return buildRruleString(e.repeat_interval_days as number, "day");
+          if (iv && iu) return buildRruleString(iv, iu, e.repeat_end_date ?? undefined, false, { startDate: e.date });
+          if (e.repeat_interval_days) return buildRruleString(e.repeat_interval_days as number, "day", undefined, false, { startDate: e.date });
           if (repeatRule === "yearly" || e.type === "birthday" || e.type === "family_day") return "FREQ=YEARLY";
           return undefined;
         })();
@@ -984,9 +985,12 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       const computedRrule: string | undefined = eventData.rrule ?? (() => {
         if (eventData.recurrenceType !== "regular") return undefined;
         if (eventData.repeatIntervalValue && eventData.repeatIntervalUnit) {
-          return buildRruleString(eventData.repeatIntervalValue, eventData.repeatIntervalUnit, eventData.repeatEndDate);
+          return buildRruleString(eventData.repeatIntervalValue, eventData.repeatIntervalUnit, eventData.repeatEndDate, false, {
+            startDate: eventData.date,
+            byWeekdays: getWeekdaysFromRrule(eventData.rrule),
+          });
         }
-        if (eventData.repeatIntervalDays) return buildRruleString(eventData.repeatIntervalDays, "day");
+        if (eventData.repeatIntervalDays) return buildRruleString(eventData.repeatIntervalDays, "day", undefined, false, { startDate: eventData.date });
         if (eventData.repeatRule === "yearly" || eventData.type === "birthday" || eventData.type === "family_day") return "FREQ=YEARLY";
         return undefined;
       })();
@@ -1683,7 +1687,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           const iv = (updates.repeatIntervalValue ?? anchor.repeatIntervalValue) as number | undefined;
           const iu = (updates.repeatIntervalUnit ?? anchor.repeatIntervalUnit) as "day" | "week" | "month" | "year" | undefined;
           const ed = updates.repeatEndDate ?? anchor.repeatEndDate;
-          if (iv && iu) return buildRruleString(iv, iu, ed);
+          if (iv && iu) return buildRruleString(iv, iu, ed, false, {
+            startDate: updates.date ?? anchor.date,
+            byWeekdays: iu === "week" ? getWeekdaysFromRrule(updates.rrule ?? anchor.rrule) : undefined,
+          });
           return updates.rrule ?? anchor.rrule;
         })();
 
