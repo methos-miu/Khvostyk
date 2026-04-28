@@ -1265,7 +1265,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         isCurrent: false,
         isModified: isVirtual ? true : undefined,
         recurrenceId: isVirtual ? event.date : undefined,
-        rrule: undefined,
+        // Keep rrule on real anchor completions so markDoneAndAdvance can
+        // derive the next rule record with the same recurrence.
+        // Virtual exception records should not carry a rule.
+        rrule: isVirtual ? undefined : event.rrule,
         status: 'done',
         createdAt: isVirtual ? new Date().toISOString() : event.createdAt,
       };
