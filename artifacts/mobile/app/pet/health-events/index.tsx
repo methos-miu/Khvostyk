@@ -31,9 +31,15 @@ import {
   getTodayStr,
   addInterval,
   getSeriesInterval,
+  getDisplayEvents,
+  getNextOccurrenceAfter,
 } from "@/utils/seriesUtils";
 
 export { getHealthEventIcon, getHealthEventColor };
+
+function generateId(): string {
+  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
 
 // ─── Status square button ─────────────────────────────────────────────────────
 
@@ -112,6 +118,7 @@ export default function HealthEventsScreen() {
     markDoneAndAdvance,
     shiftSeriesAnchor,
     checkAndUpdateEventStatuses,
+    addExceptionRecord,
   } = usePets();
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -129,28 +136,30 @@ export default function HealthEventsScreen() {
 
   // Refresh on mount
   useEffect(() => {
-    checkAndUpdateEventStatuses();
     const l = lang;
     refreshAllEventNotifications(pets, l).catch(() => {});
   }, []);
 
   const today = getTodayStr();
 
-  // ── Build flat event list ─────────────────────────────────────────────────
+  // ── Build flat event list — real records only (no virtual occurrences)
   const allItems = useMemo<EventWithPet[]>(() => {
     const items: EventWithPet[] = [];
+    const today = getTodayStr();
     pets.forEach(pet => {
+      if (petFilter && pet.id !== petFilter) return;
       (pet.healthEvents ?? []).forEach(event => {
-        if (event.status === "cancelled") return;
-        if (petFilter && pet.id !== petFilter) return;
+        if (event.isVirtual) return;
         if (typeFilter && event.type !== typeFilter) return;
-        if (timeFilter === "past" && event.date >= today) return;
-        if (timeFilter === "future" && event.date < today) return;
+        const isPast = (event.status === 'done' || event.status === 'overdue') && event.isCurrent !== true;
+        const isRule = event.isCurrent === true && event.status !== 'done' && event.status !== 'cancelled';
+        if (timeFilter === 'past' && !isPast) return;
+        if (timeFilter === 'future' && !isRule) return;
         items.push({ event, pet });
       });
     });
-    return items.sort((a, b) => a.event.date.localeCompare(b.event.date));
-  }, [pets, petFilter, typeFilter, timeFilter, today]);
+    return items.sort((a, b) => b.event.date.localeCompare(a.event.date));
+  }, [pets, petFilter, typeFilter, timeFilter]);
 
   // ── Completion handler ────────────────────────────────────────────────────
   const handleComplete = useCallback(async (event: HealthEvent, petId: string) => {
@@ -165,43 +174,55 @@ export default function HealthEventsScreen() {
       return;
     }
 
-    const { nextDate, modifiedFutureCount } = await completeHealthEvent(petId, event.id);
-
-    if (event.recurrenceType === "one_time" || !nextDate) {
+    // Virtual future event on timeline: create exception record
+    if (event.isVirtual) {
+      await completeHealthEvent(petId, event.id);
       setExpandedId(null);
       return;
     }
 
+    // One-time event: just complete it
+    if (event.recurrenceType === "one_time") {
+      await completeHealthEvent(petId, event.id);
+      setExpandedId(null);
+      return;
+    }
+
+    // Past record (overdue): just mark done, no new rule needed
+    if (event.isCurrent !== true) {
+      await completeHealthEvent(petId, event.id);
+      setExpandedId(null);
+      return;
+    }
+
+    // Rule record (isCurrent=true): compute next date and advance
     const interval = getSeriesInterval(event);
-    if (!interval) { setExpandedId(null); return; }
-
-    if (event.date === today) {
-      await markDoneAndAdvance(petId, event.id, nextDate);
+    if (!interval) {
+      await completeHealthEvent(petId, event.id);
       setExpandedId(null);
       return;
     }
 
-    const nextDateLabel = formatDateShort(nextDate);
-    Alert.alert(
-      lang === "uk" ? "Наступна подія" : "Next occurrence",
-      lang === "uk"
-        ? `Наступна запланована на ${nextDateLabel}. Посунути від сьогодні?`
-        : `Next is scheduled for ${nextDateLabel}. Shift from today?`,
-      [
-        {
-          text: lang === "uk" ? "Лишити" : "Keep",
-          onPress: async () => {
-            await markDoneAndAdvance(petId, event.id, nextDate);
-            setExpandedId(null);
-          },
-        },
-        {
-          text: lang === "uk" ? "Посунути" : "Shift",
-          onPress: () => handleShiftDialog(event, petId, modifiedFutureCount),
-        },
-      ]
-    );
-  }, [completeHealthEvent, markDoneAndAdvance, today, lang]);
+    let nextDate: string | undefined;
+    if (event.rrule) {
+      nextDate = getNextOccurrenceAfter(event.rrule, event.date);
+    } else {
+      nextDate = addInterval(event.date, interval.value, interval.unit);
+    }
+    if (event.repeatEndDate && nextDate && nextDate > event.repeatEndDate) {
+      nextDate = undefined;
+    }
+
+    if (!nextDate) {
+      await completeHealthEvent(petId, event.id);
+      setExpandedId(null);
+      return;
+    }
+
+    // Atomically mark done and create next rule record
+    await markDoneAndAdvance(petId, event.id, nextDate);
+    setExpandedId(null);
+  }, [completeHealthEvent, markDoneAndAdvance, lang]);
 
   const handleShiftDialog = useCallback(async (event: HealthEvent, petId: string, modifiedFutureCount: number) => {
     const interval = getSeriesInterval(event);
@@ -265,6 +286,32 @@ export default function HealthEventsScreen() {
       return;
     }
 
+    // Virtual future event: create exception record with updated slot
+    if (event.isVirtual) {
+      const updatedSlots = (event.cycleSlots ?? []).map((slot, i) =>
+        i === slotIndex
+          ? { ...slot, completed_at: new Date().toISOString(), completed_by: 'user' }
+          : slot
+      );
+      const allDone = updatedSlots.every(s => !!s.completed_at);
+      const newStatus: HealthEventStatus = allDone ? 'done' :
+        computeEventStatusV2({ status: 'planned', date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
+      const exceptionEvent: HealthEvent = {
+        ...event,
+        id: generateId(),
+        isVirtual: undefined,
+        isCurrent: false,
+        isModified: true,
+        recurrenceId: event.date,
+        rrule: undefined,
+        status: newStatus,
+        cycleSlots: updatedSlots,
+        createdAt: new Date().toISOString(),
+      };
+      await addExceptionRecord(petId, exceptionEvent);
+      return;
+    }
+
     const slots = event.cycleSlots ?? [];
     const slot = slots[slotIndex];
     if (!slot) return;
@@ -279,11 +326,34 @@ export default function HealthEventsScreen() {
 
     const allDone = updatedSlots.every(s => !!s.completed_at);
     const newStatus: HealthEventStatus = allDone
-      ? "done"
-      : computeEventStatusV2({ status: "planned", date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
+      ? 'done'
+      : computeEventStatusV2({ status: 'planned', date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
 
-    await updateHealthEvent(petId, event.id, { cycleSlots: updatedSlots, status: newStatus });
-  }, [updateHealthEvent, lang]);
+    if (allDone && event.isCurrent === true && event.recurrenceType === 'regular') {
+      // Rule record fully completed — markDoneAndAdvance handles done + new rule atomically
+      let nextDate: string | undefined;
+      if (event.rrule) {
+        nextDate = getNextOccurrenceAfter(event.rrule, event.date);
+      } else {
+        const interval = getSeriesInterval(event);
+        if (interval) nextDate = addInterval(event.date, interval.value, interval.unit);
+      }
+      if (event.repeatEndDate && nextDate && nextDate > event.repeatEndDate) nextDate = undefined;
+      if (nextDate) {
+        // Save completed slots on current record first
+        await updateHealthEvent(petId, event.id, { cycleSlots: updatedSlots });
+        // Then atomically mark done and create new rule
+        await markDoneAndAdvance(petId, event.id, nextDate);
+      } else {
+        // Series ended — just mark done
+        await updateHealthEvent(petId, event.id, { cycleSlots: updatedSlots, status: 'done', isCurrent: false });
+      }
+    } else {
+      // Past record (isCurrent=false) OR partial completion — just update this record only
+      // NEVER call markDoneAndAdvance for past records
+      await updateHealthEvent(petId, event.id, { cycleSlots: updatedSlots, status: newStatus });
+    }
+  }, [updateHealthEvent, addExceptionRecord, markDoneAndAdvance, lang]);
 
   // ── Delete handler ────────────────────────────────────────────────────────
   const handleDelete = useCallback((event: HealthEvent, petId: string) => {
@@ -292,6 +362,35 @@ export default function HealthEventsScreen() {
     const isRegular = event.recurrenceType === "regular";
 
     const doDelete = async (scope: "this" | "future") => {
+      if (event.isVirtual) {
+        if (scope === "this") {
+          // Insert a cancelled exception so future generation skips this date
+          const cancelledEvent: HealthEvent = {
+            ...event,
+            id: generateId(),
+            isVirtual: undefined,
+            isCurrent: false,
+            isModified: true,
+            recurrenceId: event.date,
+            rrule: undefined,
+            status: "cancelled",
+            createdAt: new Date().toISOString(),
+          };
+          await addExceptionRecord(petId, cancelledEvent);
+        } else {
+          // Truncate the series at the day before this occurrence
+          const seriesId = event.seriesId;
+          const currentPet = pets.find(p => p.id === petId);
+          const anchor = currentPet?.healthEvents?.find(e => e.seriesId === seriesId && e.isCurrent === true);
+          if (anchor) {
+            const dayBefore = addInterval(event.date, -1, "day");
+            await updateHealthEvent(petId, anchor.id, { repeatEndDate: dayBefore });
+          }
+        }
+        if (expandedId === event.id) setExpandedId(null);
+        return;
+      }
+
       if (event.notificationIds?.length) {
         await cancelHealthEventNotifications(event.notificationIds);
       }
@@ -303,7 +402,7 @@ export default function HealthEventsScreen() {
       if (expandedId === event.id) setExpandedId(null);
     };
 
-    if (!isRegular || event.isVirtual) {
+    if (!isRegular) {
       Alert.alert(t.deleteHealthEvent, t.deleteHealthEventConfirm, [
         { text: t.cancel, style: "cancel" },
         { text: t.delete, style: "destructive", onPress: () => doDelete("this") },
@@ -320,7 +419,7 @@ export default function HealthEventsScreen() {
         { text: t.cancel, style: "cancel" },
       ]
     );
-  }, [deleteHealthEvent, deleteSeriesScope, expandedId, lang, t]);
+  }, [deleteHealthEvent, deleteSeriesScope, updateHealthEvent, addExceptionRecord, pets, expandedId, lang, t]);
 
   // ── Edit handler ──────────────────────────────────────────────────────────
   const handleEdit = useCallback((event: HealthEvent, petId: string) => {

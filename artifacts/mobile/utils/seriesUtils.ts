@@ -305,7 +305,9 @@ export function generateSeriesEvents(
     try {
       const options = RRule.parseString(cleanStr);
       const rule = new RRule({ ...options, dtstart });
-      dates = rule.between(dtstart, endDate, true);
+      // inclusive=true includes anchor.date itself — we exclude it because
+      // the rule record is already shown directly in the list
+      dates = rule.between(dtstart, endDate, true).filter(d => utcDateToStr(d) !== anchor.date);
     } catch {
       return [anchor];
     }
@@ -345,8 +347,6 @@ export function generateSeriesEvents(
   const modByDate = new Map(exceptions.map((e) => [e.recurrenceId ?? e.date, e]));
   const results: HealthEvent[] = [];
 
-  results.push(modByDate.get(anchor.date) ?? anchor);
-
   let cur = anchor.date;
   while (true) {
     const next = addInterval(cur, interval.value, interval.unit);
@@ -373,12 +373,8 @@ export function generateSeriesEvents(
 /**
  * Build the full set of display events for a pet's health event list.
  *
- * Strategy:
- *   1. Completed / cancelled events are shown as-is (stored records).
- *   2. Each is_current=true record is the anchor for its series → generate occurrences.
- *   3. Legacy events (no isCurrent flag, not terminal) are treated as series anchors.
- *   4. Exception records (recurrenceId set, new arch) and isModified records (legacy)
- *      override virtual occurrences at their matching dates.
+ * Future virtual events are derived purely from rrule + the latest real record
+ * date in each series — independent of isCurrent, making the timeline self-healing.
  */
 export function getDisplayEvents(
   healthEvents: HealthEvent[],
@@ -386,51 +382,56 @@ export function getDisplayEvents(
 ): HealthEvent[] {
   const limit = limitDate ?? getLimitDate();
 
-  const completed = healthEvents.filter(
-    (e) => e.status === "done" || e.status === "cancelled"
-  );
+  // All real stored records — shown as-is, no transformation
+  const realRecords = healthEvents.filter(e => !e.isVirtual);
 
-  // De-anchored past events: isCurrent explicitly false but not yet done/cancelled
-  // and not exception records. These occur when markDoneAndAdvance replaces an anchor
-  // and the new anchor's slots are later unchecked, reverting status to planned/overdue.
-  const deAnchored = healthEvents.filter(
-    (e) =>
-      e.isCurrent === false &&
-      e.status !== "done" &&
-      e.status !== "cancelled" &&
-      e.recurrenceId == null &&
-      e.isModified !== true
-  );
-
-  // Anchors: is_current=true, OR legacy events without explicit isCurrent
-  // Exclude exception records (recurrenceId != null) from being treated as anchors
-  const anchors = healthEvents.filter(
-    (e) =>
-      e.isCurrent === true ||
-      (e.isCurrent === undefined &&
-        e.recurrenceId == null &&
-        e.isModified !== true &&
-        e.status !== "done" &&
-        e.status !== "cancelled")
-  );
-
-  // Exception records: new-arch (recurrenceId set) and legacy (isModified=true, not anchor)
-  const exceptions = healthEvents.filter(
-    (e) => e.recurrenceId != null || (e.isModified === true && e.isCurrent !== true)
-  );
-
-  const all: HealthEvent[] = [...completed, ...deAnchored];
-
-  for (const anchor of anchors) {
-    const seriesId = anchor.seriesId ?? anchor.id;
-    const seriesExceptions = exceptions.filter(
-      (e) => e.seriesId === seriesId || e.seriesId === anchor.id
-    );
-    const generated = generateSeriesEvents(anchor, seriesExceptions, limit);
-    all.push(...generated);
+  // Group records by series
+  const seriesMap = new Map<string, HealthEvent[]>();
+  for (const e of realRecords) {
+    if (e.recurrenceType !== 'regular') continue;
+    const sid = e.seriesId ?? e.id;
+    if (!seriesMap.has(sid)) seriesMap.set(sid, []);
+    seriesMap.get(sid)!.push(e);
   }
 
-  return all;
+  // For each series derive future virtual events purely from rrule + latest real date.
+  // This is independent of isCurrent, making the timeline self-healing.
+  const allVirtual: HealthEvent[] = [];
+
+  for (const [, records] of seriesMap) {
+    // Find the rule-defining record: any record with rrule set
+    const ruleDef = records.find(e => e.rrule && e.rrule.length > 0);
+    if (!ruleDef) continue;
+
+    // Latest real date in this series — start generation from here
+    const latestDate = records.reduce(
+      (max, r) => r.date > max ? r.date : max,
+      records[0].date
+    );
+
+    // Dates already covered by real records — never generate virtual for these
+    const realDatesInSeries = new Set(records.map(r => r.date));
+
+    // Exception records (modified or cancelled virtual occurrences)
+    const exceptions = records.filter(
+      r => r.recurrenceId != null || r.isModified === true
+    );
+
+    // Synthesize an anchor at latestDate to drive generateSeriesEvents
+    const virtualAnchor: HealthEvent = {
+      ...ruleDef,
+      date: latestDate,
+    };
+    const virtuals = generateSeriesEvents(virtualAnchor, exceptions, limit);
+
+    // Filter out virtuals on dates already represented by real records
+    const filtered = virtuals.filter(
+      v => v.isVirtual === true && !realDatesInSeries.has(v.date)
+    );
+    allVirtual.push(...filtered);
+  }
+
+  return [...realRecords, ...allVirtual];
 }
 
 // ─── Default slot configurations ──────────────────────────────────────────────

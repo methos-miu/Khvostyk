@@ -15,6 +15,7 @@ import {
   getTodayStr as seriesGetToday,
   buildRruleString,
   getNextOccurrenceAfter,
+  getDisplayEvents,
 } from "@/utils/seriesUtils";
 
 export type Species =
@@ -205,6 +206,8 @@ interface PetsContextType {
   /** Update a series event. scope='this' marks is_modified; scope='future' updates the anchor and drops future modified. */
   updateSeriesScope: (petId: string, eventId: string, updates: Partial<HealthEvent>, scope: "this" | "future") => Promise<void>;
   checkAndUpdateEventStatuses: () => Promise<void>;
+  /** Insert a real exception record for a virtual occurrence (cancelled or modified slot). Never creates planned records. */
+  addExceptionRecord: (petId: string, exception: HealthEvent) => Promise<void>;
   upsertBirthdayEvent: (petId: string, birthdate: string, title: string) => Promise<void>;
   getPet: (id: string) => Pet | undefined;
   isLoaded: boolean;
@@ -283,6 +286,32 @@ function extractStoragePath(photoUri?: string): string | undefined {
   return photoUri.slice(idx + marker.length).split("?")[0];
 }
 
+function fixHealthEvents(events: HealthEvent[]): HealthEvent[] {
+  const step1 = events.map(e =>
+    (e.status === 'done' || e.status === 'overdue' || e.status === 'cancelled')
+      ? { ...e, isCurrent: false }
+      : e
+  );
+  const seriesPlanned = new Map<string, HealthEvent[]>();
+  for (const e of step1) {
+    if (e.status === 'planned' && e.recurrenceType === 'regular') {
+      const sid = e.seriesId ?? e.id;
+      if (!seriesPlanned.has(sid)) seriesPlanned.set(sid, []);
+      seriesPlanned.get(sid)!.push(e);
+    }
+  }
+  const currentIds = new Set<string>();
+  for (const [, records] of seriesPlanned) {
+    const earliest = records.reduce((a, b) => a.date <= b.date ? a : b);
+    currentIds.add(earliest.id);
+  }
+  return step1.map(e => {
+    if (e.status !== 'planned' || e.recurrenceType !== 'regular') return e;
+    const shouldBeCurrent = currentIds.has(e.id);
+    return e.isCurrent === shouldBeCurrent ? e : { ...e, isCurrent: shouldBeCurrent };
+  });
+}
+
 function migratePet(raw: any): Pet {
   return {
     id: raw.id ?? generateId(),
@@ -300,7 +329,7 @@ function migratePet(raw: any): Pet {
     documents: raw.documents ?? [],
     weightHistory: raw.weightHistory ?? [],
     reminders: raw.reminders ?? [],
-    healthEvents: (raw.healthEvents ?? []).map((e: any) => {
+    healthEvents: fixHealthEvents((raw.healthEvents ?? []).map((e: any) => {
       // Migrate 'active' → 'planned'
       const rawStatus = e.status === "active" ? "planned" : e.status;
       const status: HealthEventStatus = (["planned","overdue","done","cancelled"].includes(rawStatus) ? rawStatus : "planned") as HealthEventStatus;
@@ -327,7 +356,7 @@ function migratePet(raw: any): Pet {
         repeatRule,
         // Series fields
         seriesId: e.seriesId ?? undefined,
-        isCurrent: e.isCurrent ?? (status !== "done" && status !== "cancelled" ? true : undefined),
+        isCurrent: e.isCurrent ?? false,
         isModified: e.isModified ?? false,
         // RRule fields
         rrule: migratedRrule,
@@ -342,7 +371,7 @@ function migratePet(raw: any): Pet {
         extraFields: e.extraFields ?? undefined,
         templateKey: e.templateKey ?? undefined,
       };
-    }),
+    })),
     medicalProfile: raw.medicalProfile,
     length: raw.length ?? undefined,
     height: raw.height ?? undefined,
@@ -441,7 +470,7 @@ function assemblePets(
           repeatRule,
           // Series fields
           seriesId: e.series_id ?? undefined,
-          isCurrent: e.is_current ?? (status !== "done" && status !== "cancelled"),
+          isCurrent: e.is_current ?? false,
           isModified: e.is_modified ?? false,
           // RRule fields
           rrule: assembledRrule,
@@ -579,23 +608,23 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         // This preserves events saved locally but not yet in Supabase (e.g. birthday
         // events when the insert failed due to a missing migration column, or a race
         // where syncFromSupabase queried before the insert completed).
-        healthEvents: (() => {
+        healthEvents: fixHealthEvents((() => {
           const remoteEvents = healthEventsRes.error
             ? (localHealthEventMap.get(pet.id) ?? [])
             : (pet.healthEvents ?? []);
           const localEvents = localHealthEventMap.get(pet.id) ?? [];
           const remoteIds = new Set(remoteEvents.map((e: HealthEvent) => e.id));
-          const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+          const fiveMinutesAgo = new Date(Date.now() - 300_000).toISOString();
           const pendingLocal = localEvents.filter((e: HealthEvent) =>
             !remoteIds.has(e.id) &&
             !e.isVirtual &&
-            e.createdAt && e.createdAt > sixtySecondsAgo
+            e.createdAt && e.createdAt > fiveMinutesAgo
           );
           if (__DEV__ && pendingLocal.length > 0) {
             console.log(`[syncFromSupabase] preserving ${pendingLocal.length} local-only event(s) for pet ${pet.id}:`, pendingLocal.map((e: HealthEvent) => e.id));
           }
           return [...remoteEvents, ...pendingLocal];
-        })(),
+        })()),
         length: pet.length ?? undefined,
         height: pet.height ?? undefined,
         personality: pet.personality ?? undefined,
@@ -604,7 +633,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       }));
 
       setPets(migratedPets);
+      petsRef.current = migratedPets;
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(migratedPets));
+      // Run status check AFTER clean Supabase data is loaded — not on stale AsyncStorage data
+      await checkAndUpdateEventStatuses();
     } catch (e) {
       if (__DEV__) console.warn("Supabase sync failed (offline?)", e);
     } finally {
@@ -947,9 +979,8 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   // ─── HEALTH EVENTS ────────────────────────────────────────────────────────
   const addHealthEvent = useCallback(
     async (petId: string, eventData: Omit<HealthEvent, "id" | "petId" | "createdAt">): Promise<HealthEvent> => {
-      const newId = generateId();
+      const today = getTodayStr();
       const newSeriesId = eventData.seriesId ?? generateUUID();
-      // Compute rrule from interval fields when creating a recurring event
       const computedRrule: string | undefined = eventData.rrule ?? (() => {
         if (eventData.recurrenceType !== "regular") return undefined;
         if (eventData.repeatIntervalValue && eventData.repeatIntervalUnit) {
@@ -959,71 +990,127 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         if (eventData.repeatRule === "yearly" || eventData.type === "birthday" || eventData.type === "family_day") return "FREQ=YEARLY";
         return undefined;
       })();
-      const newEvent: HealthEvent = {
-        ...eventData,
-        id: newId,
-        petId,
-        createdAt: new Date().toISOString(),
-        seriesId: newSeriesId,
-        isCurrent: true,
-        isModified: false,
-        rrule: computedRrule,
-        recurrenceId: undefined,
-      };
-      let updated = pets.map(p =>
-        p.id === petId ? { ...p, healthEvents: [...(p.healthEvents ?? []), newEvent] } : p
+
+      const newEvents: HealthEvent[] = [];
+
+      if (eventData.recurrenceType === "regular" && eventData.repeatIntervalValue && eventData.repeatIntervalUnit) {
+        // Generate all past occurrences from start date up to yesterday
+        let cursor = eventData.date;
+        while (cursor < today) {
+          const pastEvent: HealthEvent = {
+            ...eventData,
+            id: generateId(),
+            petId,
+            createdAt: new Date().toISOString(),
+            seriesId: newSeriesId,
+            isCurrent: false,
+            isModified: false,
+            rrule: computedRrule,
+            recurrenceId: undefined,
+            date: cursor,
+            status: 'overdue',
+            cycleSlots: (eventData.cycleSlots ?? []).map(({ completed_at, completed_by, ...rest }) => rest),
+            notificationIds: [],
+          };
+          newEvents.push(pastEvent);
+          cursor = addInterval(cursor, eventData.repeatIntervalValue, eventData.repeatIntervalUnit);
+        }
+
+        // Rule record: today or next future occurrence
+        const ruleDate = cursor;
+        if (!eventData.repeatEndDate || ruleDate <= eventData.repeatEndDate) {
+          const ruleEvent: HealthEvent = {
+            ...eventData,
+            id: generateId(),
+            petId,
+            createdAt: new Date().toISOString(),
+            seriesId: newSeriesId,
+            isCurrent: true,
+            isModified: false,
+            rrule: computedRrule,
+            recurrenceId: undefined,
+            date: ruleDate,
+            status: 'planned',
+            cycleSlots: (eventData.cycleSlots ?? []).map(({ completed_at, completed_by, ...rest }) => rest),
+            notificationIds: [],
+          };
+          newEvents.push(ruleEvent);
+        }
+      } else {
+        // One-time event or regular without interval details
+        const newEvent: HealthEvent = {
+          ...eventData,
+          id: generateId(),
+          petId,
+          createdAt: new Date().toISOString(),
+          seriesId: newSeriesId,
+          isCurrent: eventData.recurrenceType === "regular",
+          isModified: false,
+          rrule: computedRrule,
+          recurrenceId: undefined,
+          status: eventData.date < today ? 'overdue' : 'planned',
+          notificationIds: [],
+        };
+        newEvents.push(newEvent);
+      }
+
+      // family_day: sync adoption date
+      let updatedPets = petsRef.current.map(p =>
+        p.id === petId ? { ...p, healthEvents: [...(p.healthEvents ?? []), ...newEvents] } : p
       );
-      // family_day: also save adoption_date on the pet
-      if (newEvent.type === "family_day" && newEvent.date) {
-        updated = updated.map(p =>
-          p.id === petId ? { ...p, adoptionDate: newEvent.date } : p
+      if (newEvents.some(e => e.type === "family_day") && eventData.date) {
+        updatedPets = updatedPets.map(p =>
+          p.id === petId ? { ...p, adoptionDate: eventData.date } : p
         );
         getCurrentUserId().then(uid => {
           if (!uid) return;
-          supabase.from("pets").update({ adoption_date: newEvent.date }).eq("id", petId)
-            .then(({ error }) => { if (error && __DEV__) console.warn("Supabase family_day adoptionDate:", error.message); });
+          supabase.from("pets").update({ adoption_date: eventData.date }).eq("id", petId)
+            .then(({ error }) => { if (error && __DEV__) console.warn("Supabase family_day:", error.message); });
         });
       }
-      setPets(updated);
-      savePets(updated);
 
-      supabase.from("health_events").insert({
-        id: newEvent.id,
-        pet_id: petId,
-        type: newEvent.type,
-        title: newEvent.title,
-        date: newEvent.date,
-        time: newEvent.time ?? null,
-        next_date: newEvent.nextDate ?? null,
-        next_time: newEvent.nextTime ?? null,
-        status: newEvent.status,
-        recurrence_type: newEvent.recurrenceType,
-        repeat_interval_days: newEvent.repeatIntervalDays ?? null,
-        repeat_rule: newEvent.repeatRule ?? null,
-        repeat_interval_value: newEvent.repeatIntervalValue ?? null,
-        repeat_interval_unit: newEvent.repeatIntervalUnit ?? null,
-        repeat_end_date: newEvent.repeatEndDate ?? null,
-        series_id: newEvent.seriesId,
-        is_current: true,
-        is_modified: false,
-        rrule: newEvent.rrule ?? null,
-        recurrence_id: null,
-        times_per_cycle: newEvent.timesPerCycle ?? 1,
-        cycle_slots: newEvent.cycleSlots ?? [],
-        notes: newEvent.notes ?? null,
-        photos: newEvent.photos ?? [],
-        contact_name: newEvent.contactName ?? null,
-        contact_phone: newEvent.contactPhone ?? null,
-        contact_address: newEvent.contactAddress ?? null,
-        notification_ids: newEvent.notificationIds ?? [],
-        extra_fields: newEvent.extraFields ?? {},
-        template_key: newEvent.templateKey ?? null,
-        created_at: newEvent.createdAt,
-      }).then(({ error }) => {
+      setPets(updatedPets);
+      petsRef.current = updatedPets;
+      savePets(updatedPets);
+
+      // Save all records to Supabase sequentially to avoid races
+      for (const event of newEvents) {
+        const { error } = await supabase.from("health_events").insert({
+          id: event.id,
+          pet_id: petId,
+          type: event.type,
+          title: event.title,
+          date: event.date,
+          time: event.time ?? null,
+          status: event.status,
+          recurrence_type: event.recurrenceType,
+          repeat_interval_days: event.repeatIntervalDays ?? null,
+          repeat_rule: event.repeatRule ?? null,
+          repeat_interval_value: event.repeatIntervalValue ?? null,
+          repeat_interval_unit: event.repeatIntervalUnit ?? null,
+          repeat_end_date: event.repeatEndDate ?? null,
+          series_id: event.seriesId,
+          is_current: event.isCurrent ?? false,
+          is_modified: event.isModified ?? false,
+          rrule: event.rrule ?? null,
+          recurrence_id: event.recurrenceId ?? null,
+          times_per_cycle: event.timesPerCycle ?? 1,
+          cycle_slots: event.cycleSlots ?? [],
+          notes: event.notes ?? null,
+          photos: event.photos ?? [],
+          contact_name: event.contactName ?? null,
+          contact_phone: event.contactPhone ?? null,
+          contact_address: event.contactAddress ?? null,
+          notification_ids: [],
+          extra_fields: event.extraFields ?? {},
+          template_key: event.templateKey ?? null,
+          created_at: event.createdAt,
+        });
         if (error && __DEV__) console.warn("Supabase addHealthEvent:", error.message);
-      });
+      }
 
-      return newEvent;
+      const ruleRecord = newEvents.find(e => e.isCurrent) ?? newEvents[newEvents.length - 1];
+      return ruleRecord;
     },
     [pets]
   );
@@ -1074,6 +1161,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       }
 
       setPets(petsToSave);
+      petsRef.current = petsToSave;
       await savePets(petsToSave);
 
       const supabaseUpdate: Record<string, any> = {};
@@ -1130,8 +1218,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   );
 
   /**
-   * Mark an event as done. For regular series events, returns info the screen
-   * needs to decide whether to auto-advance or show a dialog.
+   * Mark an event as done. Handles virtual occurrences directly — creates a done
+   * exception record without materializing a planned record first. For anchor events
+   * returns info the screen needs to decide whether to auto-advance or show a dialog.
    *
    * Returns: { nextDate?, modifiedFutureCount }
    */
@@ -1139,57 +1228,163 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     async (petId: string, eventId: string): Promise<{ nextDate?: string; modifiedFutureCount: number }> => {
       const currentPets = petsRef.current;
       const pet = currentPets.find(p => p.id === petId);
-      const event = pet?.healthEvents?.find(e => e.id === eventId);
-      // Virtual events (id: virtual_...) are not in healthEvents — silently skip
+
+      // Find real event OR reconstruct from virtual id
+      let event = pet?.healthEvents?.find(e => e.id === eventId);
+      let isVirtual = false;
+
+      if (!event && eventId.startsWith('virtual_')) {
+        isVirtual = true;
+        const displayEvents = getDisplayEvents(pet?.healthEvents ?? []);
+        event = displayEvents.find(e => e.id === eventId);
+      }
+
       if (!pet || !event) return { modifiedFutureCount: 0 };
 
-      // Mark done
-      const doneEvent: HealthEvent = { ...event, status: "done", isCurrent: false };
-      const newHealthEvents = (pet.healthEvents ?? []).map(e => e.id === eventId ? doneEvent : e);
+      // Past record (not the active rule, not virtual): just mark done, never compute nextDate
+      if (event.isCurrent !== true && !isVirtual) {
+        const doneEvent: HealthEvent = { ...event, status: 'done' };
+        const newHealthEvents = (pet.healthEvents ?? []).map(e => e.id === eventId ? doneEvent : e);
+        const updated = currentPets.map(p => p.id === petId ? { ...p, healthEvents: newHealthEvents } : p);
+        setPets(updated);
+        petsRef.current = updated;
+        await savePets(updated);
+        supabase.from('health_events')
+          .update({ status: 'done' })
+          .eq('id', eventId)
+          .then(({ error }) => { if (error && __DEV__) console.warn('Supabase completeHealthEvent (past):', error.message); });
+        return { modifiedFutureCount: 0 };
+      }
 
+      // Build done record
+      const doneId = isVirtual ? generateId() : event.id;
+      const doneEvent: HealthEvent = {
+        ...event,
+        id: doneId,
+        isVirtual: undefined,
+        isCurrent: false,
+        isModified: isVirtual ? true : undefined,
+        recurrenceId: isVirtual ? event.date : undefined,
+        rrule: undefined,
+        status: 'done',
+        createdAt: isVirtual ? new Date().toISOString() : event.createdAt,
+      };
+
+      // Compute next occurrence
       let nextDate: string | undefined;
-
-      if (event.recurrenceType === "regular") {
-        // New architecture: compute next occurrence from rrule
+      if (event.recurrenceType === 'regular') {
         if (event.rrule) {
           nextDate = getNextOccurrenceAfter(event.rrule, event.date);
         } else {
-          // Legacy fallback
           const interval = getSeriesInterval(event);
           if (interval) nextDate = addInterval(event.date, interval.value, interval.unit);
         }
-        // Respect repeat end date
-        if (event.repeatEndDate && nextDate && nextDate > event.repeatEndDate) {
-          nextDate = undefined;
-        }
+        if (event.repeatEndDate && nextDate && nextDate > event.repeatEndDate) nextDate = undefined;
       }
 
-      // Count future exception/modified records in same series (used by dialog)
+      // Count future modified/exception records in same series (used by advance dialog)
       const seriesId = event.seriesId ?? event.id;
       const modifiedFuture = (pet.healthEvents ?? []).filter(
-        e =>
-          e.seriesId === seriesId &&
-          e.id !== eventId &&
-          e.date > event.date &&
-          e.status !== "done" &&
-          e.status !== "cancelled" &&
+        e => e.seriesId === seriesId && e.id !== event!.id && e.date > event!.date &&
+          e.status !== 'done' && e.status !== 'cancelled' &&
           (e.recurrenceId != null || e.isModified === true)
       );
 
+      // Update local state
+      let newHealthEvents: HealthEvent[];
+      if (isVirtual) {
+        // Add done exception record — anchor stays untouched
+        newHealthEvents = [...(pet.healthEvents ?? []), doneEvent];
+      } else {
+        // Replace anchor with done version
+        newHealthEvents = (pet.healthEvents ?? []).map(e => e.id === eventId ? doneEvent : e);
+      }
+
       const updated = currentPets.map(p => p.id === petId ? { ...p, healthEvents: newHealthEvents } : p);
       setPets(updated);
+      petsRef.current = updated;
       await savePets(updated);
 
-      supabase.from("health_events")
-        .update({ status: "done", is_current: false })
-        .eq("id", eventId)
-        .then(({ error }) => {
-          if (error && __DEV__) console.warn("Supabase completeHealthEvent:", error.message);
-        });
+      // Sync to Supabase
+      if (isVirtual) {
+        supabase.from('health_events').insert({
+          id: doneEvent.id,
+          pet_id: petId,
+          type: doneEvent.type,
+          title: doneEvent.title,
+          date: doneEvent.date,
+          time: doneEvent.time ?? null,
+          status: 'done',
+          recurrence_type: doneEvent.recurrenceType,
+          series_id: doneEvent.seriesId,
+          is_current: false,
+          is_modified: true,
+          rrule: null,
+          recurrence_id: doneEvent.recurrenceId ?? null,
+          times_per_cycle: doneEvent.timesPerCycle ?? 1,
+          cycle_slots: doneEvent.cycleSlots ?? [],
+          repeat_interval_value: doneEvent.repeatIntervalValue ?? null,
+          repeat_interval_unit: doneEvent.repeatIntervalUnit ?? null,
+          repeat_end_date: doneEvent.repeatEndDate ?? null,
+          notes: doneEvent.notes ?? null,
+          photos: doneEvent.photos ?? [],
+          extra_fields: doneEvent.extraFields ?? {},
+          template_key: doneEvent.templateKey ?? null,
+          notification_ids: [],
+          created_at: doneEvent.createdAt,
+        }).then(({ error }) => { if (error && __DEV__) console.warn('Supabase completeHealthEvent (virtual):', error.message); });
+      } else {
+        supabase.from('health_events')
+          .update({ status: 'done', is_current: false })
+          .eq('id', eventId)
+          .then(({ error }) => { if (error && __DEV__) console.warn('Supabase completeHealthEvent:', error.message); });
+      }
 
       return { nextDate, modifiedFutureCount: modifiedFuture.length };
     },
     [] // reads petsRef.current
+  );
+
+  /** Insert a real exception record for a virtual occurrence (e.g. cancelled or slot-completed). */
+  const addExceptionRecord = useCallback(
+    async (petId: string, exception: HealthEvent) => {
+      const currentPets = petsRef.current;
+      const pet = currentPets.find(p => p.id === petId);
+      if (!pet) return;
+
+      const newEvents = [...(pet.healthEvents ?? []), exception];
+      const updated = currentPets.map(p => p.id === petId ? { ...p, healthEvents: newEvents } : p);
+      setPets(updated);
+      petsRef.current = updated;
+      await savePets(updated);
+
+      supabase.from('health_events').insert({
+        id: exception.id,
+        pet_id: petId,
+        type: exception.type,
+        title: exception.title,
+        date: exception.date,
+        status: exception.status,
+        recurrence_type: exception.recurrenceType,
+        series_id: exception.seriesId,
+        is_current: false,
+        is_modified: true,
+        rrule: null,
+        recurrence_id: exception.recurrenceId ?? null,
+        times_per_cycle: exception.timesPerCycle ?? 1,
+        cycle_slots: exception.cycleSlots ?? [],
+        repeat_interval_value: exception.repeatIntervalValue ?? null,
+        repeat_interval_unit: exception.repeatIntervalUnit ?? null,
+        repeat_end_date: exception.repeatEndDate ?? null,
+        notes: exception.notes ?? null,
+        photos: exception.photos ?? [],
+        extra_fields: exception.extraFields ?? {},
+        template_key: exception.templateKey ?? null,
+        notification_ids: [],
+        created_at: exception.createdAt,
+      }).then(({ error }) => { if (error && __DEV__) console.warn('Supabase addExceptionRecord:', error.message); });
+    },
+    []
   );
 
   /**
@@ -1203,40 +1398,48 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       const event = pet?.healthEvents?.find(e => e.id === eventId);
       if (!pet || !event) return;
 
-      const doneEvent: HealthEvent = { ...event, status: "done", isCurrent: false };
-      const resetCycleSlots = (event.cycleSlots ?? []).map(
+      // Guard against double-tap
+      const alreadyExists = pet.healthEvents?.some(
+        e => e.seriesId === event.seriesId && e.date === nextDate && e.isCurrent === true
+      );
+      if (alreadyExists) return;
+
+      const doneEvent: HealthEvent = {
+        ...event,
+        status: "done",
+        isCurrent: false,
+      };
+
+      const resetSlots = (event.cycleSlots ?? []).map(
         ({ completed_at, completed_by, ...rest }) => rest
       );
-      const nextStatus = computeEventStatusV2({ status: "planned", date: nextDate, type: event.type, cycleSlots: resetCycleSlots, time: event.time });
-      // New anchor preserves rrule so future occurrence generation continues correctly
+
       const nextEvent: HealthEvent = {
         ...event,
         id: generateId(),
         date: nextDate,
-        status: nextStatus,
+        status: 'planned',
         isCurrent: true,
         isModified: false,
-        rrule: event.rrule,        // preserve rrule on new anchor
-        recurrenceId: undefined,   // anchors never have recurrenceId
+        rrule: event.rrule,
+        recurrenceId: undefined,
         notificationIds: [],
         notes: undefined,
         photos: [],
-        cycleSlots: resetCycleSlots,
+        cycleSlots: resetSlots,
         createdAt: new Date().toISOString(),
       };
-
-      // Fast local check — guards against double-tap before Supabase responds
-      const alreadyExistsLocally = pet.healthEvents?.some(
-        e => e.seriesId === event.seriesId && e.date === nextDate && e.isCurrent === true
-      );
-      if (alreadyExistsLocally) return;
 
       const newHealthEvents = [
         ...(pet.healthEvents ?? []).map(e => e.id === eventId ? doneEvent : e),
         nextEvent,
       ];
-      const updated = currentPets.map(p => p.id === petId ? { ...p, healthEvents: newHealthEvents } : p);
+
+      const updated = currentPets.map(p =>
+        p.id === petId ? { ...p, healthEvents: newHealthEvents } : p
+      );
       setPets(updated);
+      petsRef.current = updated;
       await savePets(updated);
 
       supabase.from("health_events")
@@ -1244,18 +1447,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         .eq("id", eventId)
         .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (done):", error.message); });
 
-      // Check Supabase before inserting to prevent duplicates after re-login
-      const { data: existing } = await supabase
-        .from('health_events')
-        .select('id')
-        .eq('series_id', event.seriesId ?? event.id)
-        .eq('date', nextDate)
-        .eq('is_current', true)
-        .single();
-
-      if (existing) return;
-
-      supabase.from("health_events").insert({
+      supabase.from("health_events").upsert({
         id: nextEvent.id,
         pet_id: petId,
         type: nextEvent.type,
@@ -1285,7 +1477,8 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         extra_fields: nextEvent.extraFields ?? {},
         template_key: nextEvent.templateKey ?? null,
         created_at: nextEvent.createdAt,
-      }).then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (next):", error.message); });
+      }, { onConflict: 'id', ignoreDuplicates: true })
+        .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (next):", error.message); });
     },
     []
   );
@@ -1494,21 +1687,30 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
   const checkAndUpdateEventStatuses = useCallback(async () => {
     const currentPets = petsRef.current;
+    const newRuleRecords: { petId: string; event: HealthEvent }[] = [];
 
     const updatedPets = currentPets.map(pet => {
       const updatedEvents: HealthEvent[] = [];
       let petChanged = false;
 
       for (const event of pet.healthEvents ?? []) {
-        if (event.status === "done" || event.status === "cancelled" || event.isVirtual) {
+        if (event.status === 'done' || event.status === 'cancelled' || event.isVirtual) {
           updatedEvents.push(event);
           continue;
         }
 
-        const newStatus = computeEventStatus(event, ""); // uses computeEventStatusV2 internally
+        const newStatus = computeEventStatus(event, '');
+
         if (newStatus !== event.status) {
           petChanged = true;
-          updatedEvents.push({ ...event, status: newStatus });
+
+          if (event.isCurrent === true && newStatus === 'overdue') {
+            // Rule record became overdue — demote it, schedule a new rule
+            updatedEvents.push({ ...event, status: newStatus, isCurrent: false });
+            newRuleRecords.push({ petId: pet.id, event });
+          } else {
+            updatedEvents.push({ ...event, status: newStatus });
+          }
         } else {
           updatedEvents.push(event);
         }
@@ -1518,25 +1720,122 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       return pet;
     });
 
-    const anyChanged = updatedPets.some((p, i) => p !== currentPets[i]);
+    // Add new rule records for series whose rule became overdue
+    const finalPets = updatedPets.map(pet => {
+      const newRules = newRuleRecords.filter(r => r.petId === pet.id);
+      if (newRules.length === 0) return pet;
+
+      const additionalEvents: HealthEvent[] = [];
+
+      for (const { event } of newRules) {
+        let nextDate: string | undefined;
+        if (event.rrule) {
+          nextDate = getNextOccurrenceAfter(event.rrule, event.date);
+        } else if (event.repeatIntervalValue && event.repeatIntervalUnit) {
+          nextDate = addInterval(event.date, event.repeatIntervalValue, event.repeatIntervalUnit);
+        }
+        if (event.repeatEndDate && nextDate && nextDate > event.repeatEndDate) nextDate = undefined;
+        if (!nextDate) continue;
+
+        // Never create a new rule if ANY active rule OR any record with the
+        // target nextDate already exists for this series. This prevents duplicates
+        // from races between focus-triggered status checks and user-initiated
+        // completions.
+        const alreadyExists = (pet.healthEvents ?? []).some(
+          e => e.seriesId === event.seriesId && (
+            // Active rule already exists in the series
+            (e.isCurrent === true && e.status !== 'done' && e.status !== 'overdue' && e.status !== 'cancelled') ||
+            // OR any record (rule, exception, past) already exists for the target date
+            (e.date === nextDate && !e.isVirtual)
+          )
+        );
+        if (alreadyExists) continue;
+
+        const resetSlots = (event.cycleSlots ?? []).map(
+          ({ completed_at, completed_by, ...rest }) => rest
+        );
+
+        const newRule: HealthEvent = {
+          ...event,
+          id: generateId(),
+          date: nextDate,
+          status: 'planned',
+          isCurrent: true,
+          isModified: false,
+          rrule: event.rrule,
+          recurrenceId: undefined,
+          notificationIds: [],
+          notes: undefined,
+          photos: [],
+          cycleSlots: resetSlots,
+          createdAt: new Date().toISOString(),
+        };
+
+        additionalEvents.push(newRule);
+
+        supabase.from('health_events').update({ status: 'overdue', is_current: false })
+          .eq('id', event.id)
+          .then(({ error }) => { if (error && __DEV__) console.warn('Supabase statusCheck overdue:', error.message); });
+
+        supabase.from('health_events').insert({
+          id: newRule.id,
+          pet_id: pet.id,
+          type: newRule.type,
+          title: newRule.title,
+          date: newRule.date,
+          time: newRule.time ?? null,
+          status: newRule.status,
+          recurrence_type: newRule.recurrenceType,
+          repeat_interval_days: newRule.repeatIntervalDays ?? null,
+          repeat_rule: newRule.repeatRule ?? null,
+          repeat_interval_value: newRule.repeatIntervalValue ?? null,
+          repeat_interval_unit: newRule.repeatIntervalUnit ?? null,
+          repeat_end_date: newRule.repeatEndDate ?? null,
+          series_id: newRule.seriesId,
+          is_current: true,
+          is_modified: false,
+          rrule: newRule.rrule ?? null,
+          recurrence_id: null,
+          times_per_cycle: newRule.timesPerCycle ?? 1,
+          cycle_slots: newRule.cycleSlots ?? [],
+          notes: null,
+          photos: [],
+          contact_name: newRule.contactName ?? null,
+          contact_phone: newRule.contactPhone ?? null,
+          contact_address: newRule.contactAddress ?? null,
+          notification_ids: [],
+          extra_fields: newRule.extraFields ?? {},
+          template_key: newRule.templateKey ?? null,
+          created_at: newRule.createdAt,
+        }).then(({ error }) => { if (error && __DEV__) console.warn('Supabase statusCheck newRule:', error.message); });
+      }
+
+      return {
+        ...pet,
+        healthEvents: [...(pet.healthEvents ?? []), ...additionalEvents],
+      };
+    });
+
+    const anyChanged = finalPets.some((p, i) => p !== currentPets[i]);
     if (!anyChanged) return;
 
-    setPets(updatedPets);
-    await savePets(updatedPets);
+    setPets(finalPets);
+    petsRef.current = finalPets;
+    await savePets(finalPets);
 
-    // Sync status changes to Supabase (only stored events)
-    for (const pet of updatedPets) {
+    // Sync remaining status changes to Supabase (skip overdue rule records — handled above)
+    for (const pet of finalPets) {
       for (const event of pet.healthEvents ?? []) {
-        if (event.isVirtual) continue;
+        if (event.isVirtual || event.isCurrent === true) continue;
         const original = currentPets
           .find(p => p.id === pet.id)?.healthEvents
           ?.find(e => e.id === event.id);
-        if (original && original.status !== event.status) {
-          supabase.from("health_events")
+        if (original && original.status !== event.status && event.status !== 'overdue') {
+          supabase.from('health_events')
             .update({ status: event.status })
-            .eq("id", event.id)
+            .eq('id', event.id)
             .then(({ error }) => {
-              if (error && __DEV__) console.warn("Supabase statusCheck update:", error.message);
+              if (error && __DEV__) console.warn('Supabase statusCheck update:', error.message);
             });
         }
       }
@@ -1660,12 +1959,6 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // ── Run status check once after initial data load ──────────────────────────
-  useEffect(() => {
-    if (isLoaded) {
-      checkAndUpdateEventStatuses();
-    }
-  }, [isLoaded]);
 
   return (
     <PetsContext.Provider
@@ -1678,7 +1971,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         addHealthEvent, updateHealthEvent, deleteHealthEvent,
         completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor,
         deleteSeriesScope, updateSeriesScope,
-        checkAndUpdateEventStatuses, upsertBirthdayEvent,
+        checkAndUpdateEventStatuses, addExceptionRecord, upsertBirthdayEvent,
         getPet, isLoaded, isSyncing,
         exportData, importData,
       }}

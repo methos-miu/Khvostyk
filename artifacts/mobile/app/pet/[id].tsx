@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionSheetIOS,
@@ -169,7 +169,7 @@ function getCardHeader(dateStr: string, language: string): string {
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
-    getPet, deletePet, updatePet, checkAndUpdateEventStatuses,
+    getPet, deletePet, updatePet,
     completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent,
   } = usePets();
   const insets = useSafeAreaInsets();
@@ -502,11 +502,9 @@ export default function PetProfileScreen() {
     setActiveDateStr(todayStr);
   }, [todayStr]);
 
-  useFocusEffect(
-    useCallback(() => {
-      checkAndUpdateEventStatuses();
-    }, [])
-  );
+  // checkAndUpdateEventStatuses runs once after Supabase sync (in PetsContext).
+  // Running it on every focus causes duplicate rule creation due to races with
+  // user-initiated completions. The status will be re-evaluated on next app open.
 
   const handleOptions = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
