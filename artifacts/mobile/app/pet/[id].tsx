@@ -170,7 +170,7 @@ export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     getPet, deletePet, updatePet,
-    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent,
+    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent, addExceptionRecord,
   } = usePets();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
@@ -354,6 +354,23 @@ export default function PetProfileScreen() {
       ? "done"
       : computeEventStatusV2({ status: "planned", date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
 
+    if (event.isVirtual) {
+      const exceptionEvent: HealthEvent = {
+        ...event,
+        id: generateId(),
+        isVirtual: undefined,
+        isCurrent: false,
+        isModified: true,
+        recurrenceId: event.date,
+        rrule: undefined,
+        status: newStatus,
+        cycleSlots: updatedSlots,
+        createdAt: new Date().toISOString(),
+      };
+      await addExceptionRecord(pet.id, exceptionEvent);
+      return;
+    }
+
     // Optimistic update: reflect the change in the UI immediately before any async work.
     // All subsequent async operations run against the database in the background;
     // intermediate PetsContext re-renders are masked by this override so the schedule
@@ -424,7 +441,7 @@ export default function PetProfileScreen() {
         language === "uk" ? "Не вдалося оновити" : "Failed to update"
       );
     }
-  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, language, todayForHandlers]);
+  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers]);
 
   const handleUndoComplete = useCallback((event: HealthEvent) => {
     if (!pet) return;
