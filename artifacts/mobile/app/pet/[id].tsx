@@ -391,10 +391,7 @@ export default function PetProfileScreen() {
           const withinEndDate = !event.repeatEndDate || nextDate <= event.repeatEndDate;
           if (nextDate > event.date && withinEndDate) {
             try {
-              await Promise.all([
-                markDoneAndAdvance(pet.id, event.id, nextDate),
-                updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots }),
-              ]);
+              await markDoneAndAdvance(pet.id, event.id, nextDate, updatedSlots);
             } finally {
               advancingSeriesRef.current.delete(event.id);
             }
