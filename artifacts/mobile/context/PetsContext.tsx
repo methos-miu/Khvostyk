@@ -199,7 +199,7 @@ interface PetsContextType {
   /** Mark an event done. For regular events returns the next occurrence info. */
   completeHealthEvent: (petId: string, eventId: string) => Promise<{ nextDate?: string; modifiedFutureCount: number }>;
   /** Atomic: mark event done + create next is_current record (regular events only). */
-  markDoneAndAdvance: (petId: string, eventId: string, nextDate: string) => Promise<void>;
+  markDoneAndAdvance: (petId: string, eventId: string, nextDate: string, doneCycleSlots?: CycleSlot[]) => Promise<void>;
   /** Shift series anchor to a new date (updates is_current record; optionally shifts modified events). */
   shiftSeriesAnchor: (petId: string, seriesId: string, newDate: string, shiftModified?: boolean) => Promise<void>;
   /** Delete a series future event with scope: 'this' (one record) or 'future' (all future). */
@@ -1408,7 +1408,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
    * Used when completing a regular event on its scheduled day (silent auto-advance).
    */
   const markDoneAndAdvance = useCallback(
-    async (petId: string, eventId: string, nextDate: string) => {
+    async (petId: string, eventId: string, nextDate: string, doneCycleSlots?: CycleSlot[]) => {
       const currentPets = petsRef.current;
       const pet = currentPets.find(p => p.id === petId);
       const event = pet?.healthEvents?.find(e => e.id === eventId);
@@ -1444,6 +1444,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         ...event,
         status: "done",
         isCurrent: false,
+        cycleSlots: doneCycleSlots ?? event.cycleSlots,
       };
 
       const resetSlots = (event.cycleSlots ?? []).map(
@@ -1479,7 +1480,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       await savePets(updated);
 
       supabase.from("health_events")
-        .update({ status: "done", is_current: false })
+        .update({ status: "done", is_current: false, cycle_slots: doneEvent.cycleSlots ?? [] })
         .eq("id", eventId)
         .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (done):", error.message); });
 
