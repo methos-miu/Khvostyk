@@ -548,39 +548,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   const syncFromSupabase = async (userId: string) => {
     setIsSyncing(true);
     try {
-      let petsRows: any[] = [];
-
-      // Stage 3 dual-read:
-      // 1) read visible pet IDs through active memberships
-      // 2) fallback to legacy owner_id read if memberships are unavailable
-      const { data: membershipsRows, error: membershipsError } = await supabase
-        .from("pet_memberships")
-        .select("pet_id")
-        .eq("user_id", userId)
-        .eq("status", "active");
-
-      if (!membershipsError && membershipsRows) {
-        const membershipPetIds = Array.from(new Set(
-          membershipsRows
-            .map((m: any) => m.pet_id)
-            .filter((id: any) => typeof id === "string" && id.length > 0)
-        ));
-        if (membershipPetIds.length > 0) {
-          const { data: memberPetsRows, error: memberPetsError } = await supabase
-            .from("pets").select("*").in("id", membershipPetIds);
-          if (!memberPetsError && memberPetsRows) petsRows = memberPetsRows;
-        }
-      }
-
-      // Legacy fallback (owner_id) for transition safety / partial migrations.
-      if (petsRows.length === 0) {
-        const { data: ownerPetsRows, error: ownerPetsError } = await supabase
-          .from("pets").select("*").eq("owner_id", userId);
-        if (ownerPetsError && __DEV__) console.warn("Supabase pets owner fallback:", ownerPetsError.message);
-        petsRows = ownerPetsRows ?? [];
-      }
-
-      if (!petsRows.length) { setIsSyncing(false); return; }
+      const { data: petsRows, error } = await supabase
+        .from("pets").select("*").eq("owner_id", userId);
+      if (error || !petsRows?.length) { setIsSyncing(false); return; }
 
       const petIds = petsRows.map(p => p.id);
 
