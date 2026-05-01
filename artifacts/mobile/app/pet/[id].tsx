@@ -764,7 +764,16 @@ export default function PetProfileScreen() {
               const firstColor = hasEvents ? getHealthEventColor(firstEvent.type) : Colors.textTertiary;
               const firstIcon = hasEvents ? getHealthEventIcon(firstEvent.type) : "circle-small";
               const extraCount = sortedEvts.length - 1;
-              const hasOverdue = sortedEvts.some(e => e.status === "overdue");
+              const hasOverdue = sortedEvts.some((e) => {
+                const effectiveStatus = computeEventStatusV2({
+                  status: e.status,
+                  date: e.date,
+                  type: e.type,
+                  cycleSlots: e.cycleSlots,
+                  time: e.time,
+                });
+                return effectiveStatus === "overdue";
+              });
               return (
                 <Pressable
                   key={dateStr}
