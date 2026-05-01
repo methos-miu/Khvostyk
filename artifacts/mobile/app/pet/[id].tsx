@@ -166,6 +166,10 @@ function getCardHeader(dateStr: string, language: string): string {
   return dateLabel;
 }
 
+function generateId(): string {
+  return Date.now().toString() + Math.random().toString(36).slice(2, 11);
+}
+
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
