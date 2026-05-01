@@ -166,11 +166,15 @@ function getCardHeader(dateStr: string, language: string): string {
   return dateLabel;
 }
 
+function generateId(): string {
+  return Date.now().toString() + Math.random().toString(36).slice(2, 11);
+}
+
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     getPet, deletePet, updatePet,
-    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent,
+    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent, addExceptionRecord,
   } = usePets();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
@@ -354,6 +358,23 @@ export default function PetProfileScreen() {
       ? "done"
       : computeEventStatusV2({ status: "planned", date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
 
+    if (event.isVirtual) {
+      const exceptionEvent: HealthEvent = {
+        ...event,
+        id: generateId(),
+        isVirtual: undefined,
+        isCurrent: false,
+        isModified: true,
+        recurrenceId: event.date,
+        rrule: undefined,
+        status: newStatus,
+        cycleSlots: updatedSlots,
+        createdAt: new Date().toISOString(),
+      };
+      await addExceptionRecord(pet.id, exceptionEvent);
+      return;
+    }
+
     // Optimistic update: reflect the change in the UI immediately before any async work.
     // All subsequent async operations run against the database in the background;
     // intermediate PetsContext re-renders are masked by this override so the schedule
@@ -391,10 +412,7 @@ export default function PetProfileScreen() {
           const withinEndDate = !event.repeatEndDate || nextDate <= event.repeatEndDate;
           if (nextDate > event.date && withinEndDate) {
             try {
-              await Promise.all([
-                markDoneAndAdvance(pet.id, event.id, nextDate),
-                updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots }),
-              ]);
+              await markDoneAndAdvance(pet.id, event.id, nextDate, updatedSlots);
             } finally {
               advancingSeriesRef.current.delete(event.id);
             }
@@ -427,7 +445,7 @@ export default function PetProfileScreen() {
         language === "uk" ? "Не вдалося оновити" : "Failed to update"
       );
     }
-  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, language, todayForHandlers]);
+  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers]);
 
   const handleUndoComplete = useCallback((event: HealthEvent) => {
     if (!pet) return;
@@ -746,7 +764,16 @@ export default function PetProfileScreen() {
               const firstColor = hasEvents ? getHealthEventColor(firstEvent.type) : Colors.textTertiary;
               const firstIcon = hasEvents ? getHealthEventIcon(firstEvent.type) : "circle-small";
               const extraCount = sortedEvts.length - 1;
-              const hasOverdue = sortedEvts.some(e => e.status === "overdue");
+              const hasOverdue = sortedEvts.some((e) => {
+                const effectiveStatus = computeEventStatusV2({
+                  status: e.status,
+                  date: e.date,
+                  type: e.type,
+                  cycleSlots: e.cycleSlots,
+                  time: e.time,
+                });
+                return effectiveStatus === "overdue";
+              });
               return (
                 <Pressable
                   key={dateStr}
