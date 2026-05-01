@@ -28,6 +28,7 @@ import NetInfo from "@react-native-community/netinfo";
 import { Colors } from "@/constants/colors";
 import { usePets, MedicalProfile, Illness, HealthEvent, HealthEventStatus, CycleSlot } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { supabase } from "@/lib/supabase";
 import { getSpeciesLabel } from "@/utils/speciesLabel";
 import { calculateAge, formatDateShort, formatDate, getDaysUntil, parseDate } from "@/utils/notifications";
 import { getAnimalEmoji } from "@/constants/animals";
@@ -166,11 +167,15 @@ function getCardHeader(dateStr: string, language: string): string {
   return dateLabel;
 }
 
+function generateId(): string {
+  return Date.now().toString() + Math.random().toString(36).slice(2, 11);
+}
+
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
     getPet, deletePet, updatePet,
-    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent,
+    completeHealthEvent, markDoneAndAdvance, shiftSeriesAnchor, updateHealthEvent, deleteHealthEvent, addExceptionRecord,
   } = usePets();
   const insets = useSafeAreaInsets();
   const { t, language } = useLanguage();
@@ -187,6 +192,9 @@ export default function PetProfileScreen() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
+  const [sharedMembers, setSharedMembers] = useState<Array<{ id: string; user_id: string; role: "owner" | "editor" | "viewer"; status: "active" | "invited" | "removed"; email?: string }>>([]);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [isInviting, setIsInviting] = useState(false);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
   const [showIllnessForm, setShowIllnessForm] = useState(false);
   const [editingIllnessId, setEditingIllnessId] = useState<string | null>(null);
@@ -354,6 +362,23 @@ export default function PetProfileScreen() {
       ? "done"
       : computeEventStatusV2({ status: "planned", date: event.date, type: event.type, cycleSlots: updatedSlots, time: event.time });
 
+    if (event.isVirtual) {
+      const exceptionEvent: HealthEvent = {
+        ...event,
+        id: generateId(),
+        isVirtual: undefined,
+        isCurrent: false,
+        isModified: true,
+        recurrenceId: event.date,
+        rrule: undefined,
+        status: newStatus,
+        cycleSlots: updatedSlots,
+        createdAt: new Date().toISOString(),
+      };
+      await addExceptionRecord(pet.id, exceptionEvent);
+      return;
+    }
+
     // Optimistic update: reflect the change in the UI immediately before any async work.
     // All subsequent async operations run against the database in the background;
     // intermediate PetsContext re-renders are masked by this override so the schedule
@@ -391,10 +416,7 @@ export default function PetProfileScreen() {
           const withinEndDate = !event.repeatEndDate || nextDate <= event.repeatEndDate;
           if (nextDate > event.date && withinEndDate) {
             try {
-              await Promise.all([
-                markDoneAndAdvance(pet.id, event.id, nextDate),
-                updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots }),
-              ]);
+              await markDoneAndAdvance(pet.id, event.id, nextDate, updatedSlots);
             } finally {
               advancingSeriesRef.current.delete(event.id);
             }
@@ -427,7 +449,7 @@ export default function PetProfileScreen() {
         language === "uk" ? "Не вдалося оновити" : "Failed to update"
       );
     }
-  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, language, todayForHandlers]);
+  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers]);
 
   const handleUndoComplete = useCallback((event: HealthEvent) => {
     if (!pet) return;
@@ -528,6 +550,57 @@ export default function PetProfileScreen() {
       ]);
     }
   };
+
+  const loadSharedMembers = useCallback(async () => {
+    if (!pet?.id) return;
+    const { data, error } = await supabase
+      .from("pet_memberships")
+      .select("id,user_id,role,status")
+      .eq("pet_id", pet.id)
+      .in("status", ["active", "invited"]);
+    if (error) {
+      if (__DEV__) console.warn("loadSharedMembers:", error.message);
+      return;
+    }
+    setSharedMembers((data as any[])?.map((m) => ({
+      id: m.id, user_id: m.user_id, role: m.role, status: m.status,
+    })) ?? []);
+  }, [pet?.id]);
+
+  useEffect(() => { loadSharedMembers(); }, [loadSharedMembers]);
+
+  const handleInvite = useCallback(async () => {
+    if (!pet?.id) return;
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email) return;
+    setIsInviting(true);
+    try {
+      const { data: userRow, error: userErr } = await supabase
+        .from("users")
+        .select("id,email")
+        .eq("email", email)
+        .maybeSingle();
+      if (userErr || !userRow) {
+        Alert.alert(language === "uk" ? "Користувача не знайдено" : "User not found");
+        return;
+      }
+      const { error: inviteErr } = await supabase.from("pet_memberships").upsert({
+        pet_id: pet.id,
+        user_id: userRow.id,
+        role: "viewer",
+        status: "invited",
+      }, { onConflict: "pet_id,user_id" });
+      if (inviteErr) {
+        Alert.alert(language === "uk" ? "Помилка запрошення" : "Invite failed");
+        return;
+      }
+      setInviteEmail("");
+      await loadSharedMembers();
+      Alert.alert(language === "uk" ? "Запрошення надіслано" : "Invitation sent");
+    } finally {
+      setIsInviting(false);
+    }
+  }, [pet?.id, inviteEmail, language, loadSharedMembers]);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -746,7 +819,16 @@ export default function PetProfileScreen() {
               const firstColor = hasEvents ? getHealthEventColor(firstEvent.type) : Colors.textTertiary;
               const firstIcon = hasEvents ? getHealthEventIcon(firstEvent.type) : "circle-small";
               const extraCount = sortedEvts.length - 1;
-              const hasOverdue = sortedEvts.some(e => e.status === "overdue");
+              const hasOverdue = sortedEvts.some((e) => {
+                const effectiveStatus = computeEventStatusV2({
+                  status: e.status,
+                  date: e.date,
+                  type: e.type,
+                  cycleSlots: e.cycleSlots,
+                  time: e.time,
+                });
+                return effectiveStatus === "overdue";
+              });
               return (
                 <Pressable
                   key={dateStr}
@@ -921,6 +1003,48 @@ export default function PetProfileScreen() {
               </View>
             </Animated.View>
           ) : null}
+
+          {/* Medical Profile */}
+          <Animated.View entering={FadeInDown.delay(130)}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>{language === "uk" ? "Спільний доступ" : "Shared Access"}</Text>
+            </View>
+            <View style={styles.infoCard}>
+              {sharedMembers.length === 0 ? (
+                <Text style={styles.emptyCardText}>{language === "uk" ? "Поки що тільки ви маєте доступ" : "Only you have access for now"}</Text>
+              ) : (
+                sharedMembers.map((m, idx) => (
+                  <View key={m.id}>
+                    {idx > 0 && <View style={styles.divider} />}
+                    <View style={styles.infoRow}>
+                      <MaterialCommunityIcons name="account-outline" size={18} color={Colors.primary} />
+                      <Text style={styles.infoLabel}>{m.role.toUpperCase()}</Text>
+                      <Text style={styles.infoValue}>{m.status}</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+              <View style={styles.divider} />
+              <View style={{ gap: 8 }}>
+                <TextInput
+                  value={inviteEmail}
+                  onChangeText={setInviteEmail}
+                  placeholder={language === "uk" ? "Email для запрошення" : "Email to invite"}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  style={styles.medInput}
+                />
+                <Pressable
+                  onPress={handleInvite}
+                  disabled={isInviting || !inviteEmail.trim()}
+                  style={[styles.actionButton, (!inviteEmail.trim() || isInviting) && { opacity: 0.5 }]}
+                >
+                  <MaterialCommunityIcons name="account-plus-outline" size={18} color={Colors.primary} />
+                  <Text style={styles.actionLabel}>{language === "uk" ? "Запросити (viewer)" : "Invite (viewer)"}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Animated.View>
 
           {/* Medical Profile */}
           <Animated.View entering={FadeInDown.delay(140)}>

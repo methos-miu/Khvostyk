@@ -199,7 +199,7 @@ interface PetsContextType {
   /** Mark an event done. For regular events returns the next occurrence info. */
   completeHealthEvent: (petId: string, eventId: string) => Promise<{ nextDate?: string; modifiedFutureCount: number }>;
   /** Atomic: mark event done + create next is_current record (regular events only). */
-  markDoneAndAdvance: (petId: string, eventId: string, nextDate: string) => Promise<void>;
+  markDoneAndAdvance: (petId: string, eventId: string, nextDate: string, doneCycleSlots?: CycleSlot[]) => Promise<void>;
   /** Shift series anchor to a new date (updates is_current record; optionally shifts modified events). */
   shiftSeriesAnchor: (petId: string, seriesId: string, newDate: string, shiftModified?: boolean) => Promise<void>;
   /** Delete a series future event with scope: 'this' (one record) or 'future' (all future). */
@@ -548,9 +548,39 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   const syncFromSupabase = async (userId: string) => {
     setIsSyncing(true);
     try {
-      const { data: petsRows, error } = await supabase
-        .from("pets").select("*").eq("owner_id", userId);
-      if (error || !petsRows?.length) { setIsSyncing(false); return; }
+      let petsRows: any[] = [];
+
+      // Stage 3 dual-read:
+      // 1) read visible pet IDs through active memberships
+      // 2) fallback to legacy owner_id read if memberships are unavailable
+      const { data: membershipsRows, error: membershipsError } = await supabase
+        .from("pet_memberships")
+        .select("pet_id")
+        .eq("user_id", userId)
+        .eq("status", "active");
+
+      if (!membershipsError && membershipsRows) {
+        const membershipPetIds = Array.from(new Set(
+          membershipsRows
+            .map((m: any) => m.pet_id)
+            .filter((id: any) => typeof id === "string" && id.length > 0)
+        ));
+        if (membershipPetIds.length > 0) {
+          const { data: memberPetsRows, error: memberPetsError } = await supabase
+            .from("pets").select("*").in("id", membershipPetIds);
+          if (!memberPetsError && memberPetsRows) petsRows = memberPetsRows;
+        }
+      }
+
+      // Legacy fallback (owner_id) for transition safety / partial migrations.
+      if (petsRows.length === 0) {
+        const { data: ownerPetsRows, error: ownerPetsError } = await supabase
+          .from("pets").select("*").eq("owner_id", userId);
+        if (ownerPetsError && __DEV__) console.warn("Supabase pets owner fallback:", ownerPetsError.message);
+        petsRows = ownerPetsRows ?? [];
+      }
+
+      if (!petsRows.length) { setIsSyncing(false); return; }
 
       const petIds = petsRows.map(p => p.id);
 
@@ -691,6 +721,15 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
           created_at: newPet.createdAt,
         });
         if (petError && __DEV__) console.warn("Supabase addPet:", petError.message);
+        if (!petError) {
+          const { error: membershipError } = await supabase.from("pet_memberships").upsert({
+            pet_id: newPet.id,
+            user_id: uid,
+            role: "owner",
+            status: "active",
+          }, { onConflict: "pet_id,user_id" });
+          if (membershipError && __DEV__) console.warn("Supabase addPet membership upsert:", membershipError.message);
+        }
         if (initWeightEntry) {
           const { error: weightError } = await supabase.from("weight_entries").insert({
             id: initWeightEntry.id, pet_id: newPet.id,
@@ -1399,7 +1438,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
    * Used when completing a regular event on its scheduled day (silent auto-advance).
    */
   const markDoneAndAdvance = useCallback(
-    async (petId: string, eventId: string, nextDate: string) => {
+    async (petId: string, eventId: string, nextDate: string, doneCycleSlots?: CycleSlot[]) => {
       const currentPets = petsRef.current;
       const pet = currentPets.find(p => p.id === petId);
       const event = pet?.healthEvents?.find(e => e.id === eventId);
@@ -1435,6 +1474,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         ...event,
         status: "done",
         isCurrent: false,
+        cycleSlots: doneCycleSlots ?? event.cycleSlots,
       };
 
       const resetSlots = (event.cycleSlots ?? []).map(
@@ -1470,7 +1510,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       await savePets(updated);
 
       supabase.from("health_events")
-        .update({ status: "done", is_current: false })
+        .update({ status: "done", is_current: false, cycle_slots: doneEvent.cycleSlots ?? [] })
         .eq("id", eventId)
         .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (done):", error.message); });
 
