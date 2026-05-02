@@ -550,12 +550,7 @@ export default function PetProfileScreen() {
 
   const handleOpenShare = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      language === "uk" ? "Спільний доступ" : "Sharing",
-      language === "uk"
-        ? "Екран шерингу буде додано на наступному етапі."
-        : "Sharing screen will be added in the next stage."
-    );
+    router.push({ pathname: "/pet/share/[id]", params: { id: pet?.id } });
   };
 
 
