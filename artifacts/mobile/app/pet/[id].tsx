@@ -192,9 +192,6 @@ export default function PetProfileScreen() {
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [scrollY, setScrollY] = useState(0);
   const [showMedicalModal, setShowMedicalModal] = useState(false);
-  const [sharedMembers, setSharedMembers] = useState<Array<{ id: string; user_id: string; role: "owner" | "editor" | "viewer"; status: "active" | "invited" | "removed"; email?: string }>>([]);
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [isInviting, setIsInviting] = useState(false);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
   const [showIllnessForm, setShowIllnessForm] = useState(false);
   const [editingIllnessId, setEditingIllnessId] = useState<string | null>(null);
@@ -551,56 +548,11 @@ export default function PetProfileScreen() {
     }
   };
 
-  const loadSharedMembers = useCallback(async () => {
-    if (!pet?.id) return;
-    const { data, error } = await supabase
-      .from("pet_memberships")
-      .select("id,user_id,role,status")
-      .eq("pet_id", pet.id)
-      .in("status", ["active", "invited"]);
-    if (error) {
-      if (__DEV__) console.warn("loadSharedMembers:", error.message);
-      return;
-    }
-    setSharedMembers((data as any[])?.map((m) => ({
-      id: m.id, user_id: m.user_id, role: m.role, status: m.status,
-    })) ?? []);
-  }, [pet?.id]);
+  const handleOpenShare = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: "/pet/share/[id]", params: { id: pet?.id } });
+  };
 
-  useEffect(() => { loadSharedMembers(); }, [loadSharedMembers]);
-
-  const handleInvite = useCallback(async () => {
-    if (!pet?.id) return;
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email) return;
-    setIsInviting(true);
-    try {
-      const { data: userRow, error: userErr } = await supabase
-        .from("users")
-        .select("id,email")
-        .eq("email", email)
-        .maybeSingle();
-      if (userErr || !userRow) {
-        Alert.alert(language === "uk" ? "Користувача не знайдено" : "User not found");
-        return;
-      }
-      const { error: inviteErr } = await supabase.from("pet_memberships").upsert({
-        pet_id: pet.id,
-        user_id: userRow.id,
-        role: "viewer",
-        status: "invited",
-      }, { onConflict: "pet_id,user_id" });
-      if (inviteErr) {
-        Alert.alert(language === "uk" ? "Помилка запрошення" : "Invite failed");
-        return;
-      }
-      setInviteEmail("");
-      await loadSharedMembers();
-      Alert.alert(language === "uk" ? "Запрошення надіслано" : "Invitation sent");
-    } finally {
-      setIsInviting(false);
-    }
-  }, [pet?.id, inviteEmail, language, loadSharedMembers]);
 
   const confirmDelete = () => {
     Alert.alert(
@@ -689,9 +641,14 @@ export default function PetProfileScreen() {
                 <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
                 <Text style={styles.coverNavText}>{t.back}</Text>
               </Pressable>
-              <Pressable onPress={handleOptions} style={styles.coverNavBtn} hitSlop={8}>
-                <Text style={styles.coverDotsText}>⋯</Text>
-              </Pressable>
+              <View style={styles.coverNavActions}>
+                <Pressable onPress={handleOpenShare} style={styles.coverNavBtn} hitSlop={8}>
+                  <MaterialCommunityIcons name="share-variant-outline" size={18} color="#fff" />
+                </Pressable>
+                <Pressable onPress={handleOptions} style={styles.coverNavBtn} hitSlop={8}>
+                  <Text style={styles.coverDotsText}>⋯</Text>
+                </Pressable>
+              </View>
             </View>
             {/* Pet name & subtitle */}
             <View style={styles.coverInfo}>
@@ -1007,48 +964,6 @@ export default function PetProfileScreen() {
           {/* Medical Profile */}
           <Animated.View entering={FadeInDown.delay(130)}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{language === "uk" ? "Спільний доступ" : "Shared Access"}</Text>
-            </View>
-            <View style={styles.infoCard}>
-              {sharedMembers.length === 0 ? (
-                <Text style={styles.emptyCardText}>{language === "uk" ? "Поки що тільки ви маєте доступ" : "Only you have access for now"}</Text>
-              ) : (
-                sharedMembers.map((m, idx) => (
-                  <View key={m.id}>
-                    {idx > 0 && <View style={styles.divider} />}
-                    <View style={styles.infoRow}>
-                      <MaterialCommunityIcons name="account-outline" size={18} color={Colors.primary} />
-                      <Text style={styles.infoLabel}>{m.role.toUpperCase()}</Text>
-                      <Text style={styles.infoValue}>{m.status}</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-              <View style={styles.divider} />
-              <View style={{ gap: 8 }}>
-                <TextInput
-                  value={inviteEmail}
-                  onChangeText={setInviteEmail}
-                  placeholder={language === "uk" ? "Email для запрошення" : "Email to invite"}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                  style={styles.medInput}
-                />
-                <Pressable
-                  onPress={handleInvite}
-                  disabled={isInviting || !inviteEmail.trim()}
-                  style={[styles.actionButton, (!inviteEmail.trim() || isInviting) && { opacity: 0.5 }]}
-                >
-                  <MaterialCommunityIcons name="account-plus-outline" size={18} color={Colors.primary} />
-                  <Text style={styles.actionLabel}>{language === "uk" ? "Запросити (viewer)" : "Invite (viewer)"}</Text>
-                </Pressable>
-              </View>
-            </View>
-          </Animated.View>
-
-          {/* Medical Profile */}
-          <Animated.View entering={FadeInDown.delay(140)}>
-            <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>{language === "uk" ? "Медичний профіль" : "Medical Profile"}</Text>
               <Pressable onPress={openMedicalModal}>
                 <Text style={styles.seeAll}>{hasMedical ? (language === "uk" ? "Редагувати" : "Edit") : (language === "uk" ? "Заповнити" : "Fill In")}</Text>
@@ -1330,6 +1245,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  coverNavActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   coverNavText: {
     fontSize: 15,
