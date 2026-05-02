@@ -698,7 +698,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
             role: "owner",
             status: "active",
           }, { onConflict: "pet_id,user_id" });
-          if (membershipError && __DEV__) console.warn("Supabase addPet membership upsert:", membershipError.message);
+          if (membershipError && (membershipError as any)?.code !== "42P01" && __DEV__) {
+            console.warn("Supabase addPet membership upsert:", membershipError.message);
+          }
         }
         if (initWeightEntry) {
           const { error: weightError } = await supabase.from("weight_entries").insert({
