@@ -12,7 +12,9 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -32,6 +34,7 @@ import { PetsProvider } from "@/context/PetsContext";
 import { LanguageProvider, useLanguage } from "@/context/LanguageContext";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { Colors } from "@/constants/colors";
+import { supabase } from "@/lib/supabase";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -108,9 +111,51 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
 
 function RootLayoutNav() {
   const { t, language } = useLanguage();
+  const { user } = useAuth();
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [loadingInvites, setLoadingInvites] = useState(false);
+
+  const loadPendingInvites = React.useCallback(async () => {
+    if (!user?.id) {
+      setPendingInvites([]);
+      return;
+    }
+    const email = (user.email ?? "").toLowerCase();
+    const { data, error } = await supabase
+      .from("pet_invitations")
+      .select("id,pet_id,role,status,invitee_email,pets(name)")
+      .eq("status", "pending")
+      .or(`invitee_user_id.eq.${user.id},invitee_email.eq.${email}`)
+      .order("created_at", { ascending: true })
+      .limit(5);
+    if (!error) {
+      setPendingInvites((data as any[]) ?? []);
+    }
+  }, [user?.id, user?.email]);
+
+  useEffect(() => {
+    loadPendingInvites();
+  }, [loadPendingInvites]);
+
+  const activeInvite = pendingInvites[0];
+
+  const handleRespondInvitation = async (decision: "accept" | "decline") => {
+    if (!activeInvite?.id || loadingInvites) return;
+    setLoadingInvites(true);
+    try {
+      const rpcName = decision === "accept" ? "accept_pet_invitation" : "decline_pet_invitation";
+      const { error } = await supabase.rpc(rpcName, { p_invitation_id: activeInvite.id });
+      if (!error) {
+        setPendingInvites(prev => prev.filter(i => i.id !== activeInvite.id));
+      }
+    } finally {
+      setLoadingInvites(false);
+    }
+  };
 
   return (
     <AuthGuard>
+      <>
       <Stack
         screenOptions={{
           headerBackTitle: t.back,
@@ -181,6 +226,29 @@ function RootLayoutNav() {
           }}
         />
       </Stack>
+      <Modal transparent visible={!!activeInvite} animationType="fade" onRequestClose={() => {}}>
+        <View style={styles.inviteOverlay}>
+          <View style={styles.inviteCard}>
+            <Text style={styles.inviteTitle}>
+              {language === "uk" ? "Запрошення до спільного доступу" : "Shared access invitation"}
+            </Text>
+            <Text style={styles.inviteText}>
+              {language === "uk"
+                ? `Вас запросили стати ${activeInvite?.role === "editor" ? "співвласником" : "читачем"} тварини «${activeInvite?.pets?.name ?? ""}». Ви згодні?`
+                : `You were invited to be a ${activeInvite?.role === "editor" ? "co-owner" : "viewer"} of “${activeInvite?.pets?.name ?? ""}”. Do you agree?`}
+            </Text>
+            <View style={styles.inviteActions}>
+              <Pressable style={[styles.inviteBtn, styles.inviteDecline]} onPress={() => handleRespondInvitation("decline")} disabled={loadingInvites}>
+                <Text style={styles.inviteDeclineText}>{language === "uk" ? "Ні" : "No"}</Text>
+              </Pressable>
+              <Pressable style={[styles.inviteBtn, styles.inviteAccept]} onPress={() => handleRespondInvitation("accept")} disabled={loadingInvites}>
+                <Text style={styles.inviteAcceptText}>{language === "uk" ? "Так" : "Yes"}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+      </>
     </AuthGuard>
   );
 }
@@ -253,6 +321,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  inviteOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  inviteCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    gap: 10,
+  },
+  inviteTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },
+  inviteText: { fontSize: 15, fontFamily: "Inter_400Regular", color: Colors.textSecondary, lineHeight: 22 },
+  inviteActions: { flexDirection: "row", gap: 10, marginTop: 8 },
+  inviteBtn: { flex: 1, height: 44, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  inviteDecline: { backgroundColor: "#F3F4F6", borderWidth: 1, borderColor: Colors.border },
+  inviteAccept: { backgroundColor: Colors.primary },
+  inviteDeclineText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  inviteAcceptText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
   logo: {
     width: 200,
     height: 200,
