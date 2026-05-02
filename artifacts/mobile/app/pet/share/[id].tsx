@@ -1,0 +1,167 @@
+import React, { useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Colors } from "@/constants/colors";
+import { useLanguage } from "@/context/LanguageContext";
+import { usePets } from "@/context/PetsContext";
+
+type ShareRole = "editor" | "viewer";
+
+export default function PetShareScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { language } = useLanguage();
+  const { getPet } = usePets();
+  const pet = id ? getPet(id) : undefined;
+
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<ShareRole>("viewer");
+
+  const title = useMemo(
+    () => (language === "uk" ? "Спільний доступ" : "Shared Access"),
+    [language]
+  );
+
+  const sendInvite = () => {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) {
+      Alert.alert(language === "uk" ? "Вкажіть email" : "Enter email");
+      return;
+    }
+    Alert.alert(
+      language === "uk" ? "Наступний етап" : "Next stage",
+      language === "uk"
+        ? "Надсилання запрошень буде підключено на backend-етапі."
+        : "Sending invitations will be connected in the backend stage."
+    );
+  };
+
+  return (
+    <View style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => router.back()} style={styles.iconBtn} hitSlop={10}>
+          <MaterialCommunityIcons name="arrow-left" size={22} color={Colors.text} />
+        </Pressable>
+        <Text style={styles.headerTitle}>{title}</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.card}>
+          <Text style={styles.petName}>
+            {pet?.name ?? (language === "uk" ? "Тварина" : "Pet")}
+          </Text>
+          <Text style={styles.subtitle}>
+            {language === "uk"
+              ? "Введіть email та оберіть роль доступу"
+              : "Enter email and choose access role"}
+          </Text>
+
+          <TextInput
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            placeholder={language === "uk" ? "Email користувача" : "User email"}
+            placeholderTextColor={Colors.textTertiary}
+            style={styles.input}
+          />
+
+          <View style={styles.roleRow}>
+            <Pressable
+              onPress={() => setRole("editor")}
+              style={[styles.roleBtn, role === "editor" && styles.roleBtnActive]}
+            >
+              <Text style={[styles.roleText, role === "editor" && styles.roleTextActive]}>
+                {language === "uk" ? "Співвласник (editor)" : "Co-owner (editor)"}
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setRole("viewer")}
+              style={[styles.roleBtn, role === "viewer" && styles.roleBtnActive]}
+            >
+              <Text style={[styles.roleText, role === "viewer" && styles.roleTextActive]}>
+                {language === "uk" ? "Читач (viewer)" : "Reader (viewer)"}
+              </Text>
+            </Pressable>
+          </View>
+
+          <Pressable onPress={sendInvite} style={styles.submitBtn}>
+            <MaterialCommunityIcons name="send-outline" size={18} color="#fff" />
+            <Text style={styles.submitText}>
+              {language === "uk" ? "Надіслати запрошення" : "Send invitation"}
+            </Text>
+          </Pressable>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: Colors.background },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingBottom: 10,
+    backgroundColor: Colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  iconBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  headerTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },
+  headerSpacer: { width: 36 },
+  content: { padding: 16 },
+  card: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    gap: 12,
+  },
+  petName: { fontSize: 20, fontFamily: "Inter_700Bold", color: Colors.text },
+  subtitle: { fontSize: 14, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  input: {
+    height: 46,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: Colors.text,
+    backgroundColor: Colors.background,
+  },
+  roleRow: { gap: 8 },
+  roleBtn: {
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: Colors.background,
+  },
+  roleBtnActive: {
+    borderColor: Colors.primary,
+    backgroundColor: "#EEF4FF",
+  },
+  roleText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
+  roleTextActive: { color: Colors.primary, fontFamily: "Inter_600SemiBold" },
+  submitBtn: {
+    marginTop: 4,
+    height: 46,
+    borderRadius: 12,
+    backgroundColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  submitText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+});
