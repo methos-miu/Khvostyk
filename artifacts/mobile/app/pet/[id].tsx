@@ -548,6 +548,16 @@ export default function PetProfileScreen() {
     }
   };
 
+  const handleOpenShare = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert(
+      language === "uk" ? "Спільний доступ" : "Sharing",
+      language === "uk"
+        ? "Екран шерингу буде додано на наступному етапі."
+        : "Sharing screen will be added in the next stage."
+    );
+  };
+
 
   const confirmDelete = () => {
     Alert.alert(
@@ -636,9 +646,14 @@ export default function PetProfileScreen() {
                 <MaterialCommunityIcons name="arrow-left" size={20} color="#fff" />
                 <Text style={styles.coverNavText}>{t.back}</Text>
               </Pressable>
-              <Pressable onPress={handleOptions} style={styles.coverNavBtn} hitSlop={8}>
-                <Text style={styles.coverDotsText}>⋯</Text>
-              </Pressable>
+              <View style={styles.coverNavActions}>
+                <Pressable onPress={handleOpenShare} style={styles.coverNavBtn} hitSlop={8}>
+                  <MaterialCommunityIcons name="share-variant-outline" size={18} color="#fff" />
+                </Pressable>
+                <Pressable onPress={handleOptions} style={styles.coverNavBtn} hitSlop={8}>
+                  <Text style={styles.coverDotsText}>⋯</Text>
+                </Pressable>
+              </View>
             </View>
             {/* Pet name & subtitle */}
             <View style={styles.coverInfo}>
@@ -1235,6 +1250,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: "rgba(0,0,0,0.28)",
+  },
+  coverNavActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
   coverNavText: {
     fontSize: 15,
