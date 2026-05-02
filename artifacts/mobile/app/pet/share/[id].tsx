@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Stack } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
@@ -8,6 +8,7 @@ import { Colors } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { usePets } from "@/context/PetsContext";
 import { supabase } from "@/lib/supabase";
+import { Image } from "expo-image";
 
 type ShareRole = "editor" | "viewer";
 
@@ -21,6 +22,8 @@ export default function PetShareScreen() {
 
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<ShareRole>("viewer");
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
+  const [showQr, setShowQr] = useState(false);
 
   const title = useMemo(
     () => (language === "uk" ? "Спільний доступ" : "Shared Access"),
@@ -50,6 +53,24 @@ export default function PetShareScreen() {
     }
 
     Alert.alert(language === "uk" ? "Користувача не знайдено" : "User not found");
+  };
+
+  const generateQrInvite = async () => {
+    if (!id) return;
+    const { data, error } = await supabase.rpc("create_pet_qr_invitation", {
+      p_pet_id: id,
+      p_role: role,
+      p_expires_in_hours: 72,
+    });
+    if (error || !data?.[0]?.raw_token) {
+      Alert.alert(language === "uk" ? "Не вдалося згенерувати QR" : "Failed to generate QR");
+      return;
+    }
+
+    const deepLink = `mobile://invite?token=${encodeURIComponent(data[0].raw_token)}`;
+    const generatedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeURIComponent(deepLink)}`;
+    setQrUrl(generatedQrUrl);
+    setShowQr(true);
   };
 
   return (
@@ -138,8 +159,27 @@ export default function PetShareScreen() {
               {language === "uk" ? "Надіслати запрошення" : "Send invitation"}
             </Text>
           </Pressable>
+
+          <Pressable onPress={generateQrInvite} style={styles.qrBtn}>
+            <MaterialCommunityIcons name="qrcode" size={18} color={Colors.primary} />
+            <Text style={styles.qrBtnText}>
+              {language === "uk" ? "Згенерувати QR" : "Generate QR"}
+            </Text>
+          </Pressable>
         </View>
       </ScrollView>
+
+      <Modal visible={showQr} transparent animationType="fade" onRequestClose={() => setShowQr(false)}>
+        <View style={styles.qrOverlay}>
+          <View style={styles.qrCard}>
+            <Text style={styles.qrTitle}>{language === "uk" ? "QR-запрошення" : "QR invitation"}</Text>
+            {qrUrl ? <Image source={{ uri: qrUrl }} style={styles.qrImage} contentFit="contain" /> : null}
+            <Pressable style={styles.submitBtn} onPress={() => setShowQr(false)}>
+              <Text style={styles.submitText}>{language === "uk" ? "Закрити" : "Close"}</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -215,4 +255,33 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: "#fff" },
+  qrBtn: {
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#EEF4FF",
+  },
+  qrBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.primary },
+  qrOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.35)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  qrCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    padding: 14,
+    alignItems: "center",
+    gap: 12,
+  },
+  qrTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: Colors.text },
+  qrImage: { width: 260, height: 260 },
 });
