@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { usePets } from "@/context/PetsContext";
+import { supabase } from "@/lib/supabase";
 
 type ShareRole = "editor" | "viewer";
 
@@ -26,17 +27,54 @@ export default function PetShareScreen() {
     [language]
   );
 
-  const sendInvite = () => {
+  const sendInvite = async () => {
     const normalized = email.trim().toLowerCase();
     if (!normalized) {
       Alert.alert(language === "uk" ? "Вкажіть email" : "Enter email");
       return;
     }
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", normalized)
+      .maybeSingle();
+
+    if (existingUser?.id) {
+      Alert.alert(
+        language === "uk" ? "Наступний етап" : "Next stage",
+        language === "uk"
+          ? "Інвайт для існуючого користувача буде підключено в наступному етапі."
+          : "Existing-user invite flow will be connected in the next stage."
+      );
+      return;
+    }
+
     Alert.alert(
-      language === "uk" ? "Наступний етап" : "Next stage",
       language === "uk"
-        ? "Надсилання запрошень буде підключено на backend-етапі."
-        : "Sending invitations will be connected in the backend stage."
+        ? "Користувача не знайдено. Відправити запрошення на email?"
+        : "User not found. Send invitation email?",
+      "",
+      [
+        { text: language === "uk" ? "Ні" : "No", style: "cancel" },
+        {
+          text: language === "uk" ? "Так" : "Yes",
+          onPress: async () => {
+            const { error } = await supabase.functions.invoke("send-pet-invite-email", {
+              body: {
+                petId: id,
+                petName: pet?.name ?? "",
+                inviteeEmail: normalized,
+                role,
+              },
+            });
+            Alert.alert(
+              error
+                ? (language === "uk" ? "Не вдалося відправити email" : "Failed to send email")
+                : (language === "uk" ? "Запрошення відправлено" : "Invitation email sent")
+            );
+          },
+        },
+      ]
     );
   };
 
