@@ -195,6 +195,7 @@ export default function PetProfileScreen() {
   const [sharedMembers, setSharedMembers] = useState<Array<{ id: string; user_id: string; role: "owner" | "editor" | "viewer"; status: "active" | "invited" | "removed"; email?: string }>>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
+  const [sharingAvailable, setSharingAvailable] = useState(true);
   const [medForm, setMedForm] = useState<MedicalProfile>({});
   const [showIllnessForm, setShowIllnessForm] = useState(false);
   const [editingIllnessId, setEditingIllnessId] = useState<string | null>(null);
@@ -559,9 +560,14 @@ export default function PetProfileScreen() {
       .eq("pet_id", pet.id)
       .in("status", ["active", "invited"]);
     if (error) {
+      if ((error as any)?.code === "42P01") {
+        setSharingAvailable(false);
+        return;
+      }
       if (__DEV__) console.warn("loadSharedMembers:", error.message);
       return;
     }
+    setSharingAvailable(true);
     setSharedMembers((data as any[])?.map((m) => ({
       id: m.id, user_id: m.user_id, role: m.role, status: m.status,
     })) ?? []);
@@ -591,6 +597,11 @@ export default function PetProfileScreen() {
         status: "invited",
       }, { onConflict: "pet_id,user_id" });
       if (inviteErr) {
+        if ((inviteErr as any)?.code === "42P01") {
+          setSharingAvailable(false);
+          Alert.alert(language === "uk" ? "Шеринг тимчасово недоступний" : "Sharing is temporarily unavailable");
+          return;
+        }
         Alert.alert(language === "uk" ? "Помилка запрошення" : "Invite failed");
         return;
       }
@@ -1010,7 +1021,13 @@ export default function PetProfileScreen() {
               <Text style={styles.sectionTitle}>{language === "uk" ? "Спільний доступ" : "Shared Access"}</Text>
             </View>
             <View style={styles.infoCard}>
-              {sharedMembers.length === 0 ? (
+              {!sharingAvailable ? (
+                <Text style={styles.emptyCardText}>
+                  {language === "uk"
+                    ? "Функція спільного доступу тимчасово недоступна"
+                    : "Shared access is temporarily unavailable"}
+                </Text>
+              ) : sharedMembers.length === 0 ? (
                 <Text style={styles.emptyCardText}>{language === "uk" ? "Поки що тільки ви маєте доступ" : "Only you have access for now"}</Text>
               ) : (
                 sharedMembers.map((m, idx) => (
@@ -1036,8 +1053,8 @@ export default function PetProfileScreen() {
                 />
                 <Pressable
                   onPress={handleInvite}
-                  disabled={isInviting || !inviteEmail.trim()}
-                  style={[styles.actionButton, (!inviteEmail.trim() || isInviting) && { opacity: 0.5 }]}
+                  disabled={!sharingAvailable || isInviting || !inviteEmail.trim()}
+                  style={[styles.actionButton, (!sharingAvailable || !inviteEmail.trim() || isInviting) && { opacity: 0.5 }]}
                 >
                   <MaterialCommunityIcons name="account-plus-outline" size={18} color={Colors.primary} />
                   <Text style={styles.actionLabel}>{language === "uk" ? "Запросити (viewer)" : "Invite (viewer)"}</Text>
