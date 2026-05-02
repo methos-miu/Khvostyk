@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
@@ -41,6 +42,7 @@ export default function PetShareScreen() {
 
   return (
     <View style={styles.root}>
+      <Stack.Screen options={{ headerShown: false }} />
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => router.back()} style={styles.iconBtn} hitSlop={10}>
           <MaterialCommunityIcons name="arrow-left" size={22} color={Colors.text} />
@@ -70,22 +72,51 @@ export default function PetShareScreen() {
             style={styles.input}
           />
 
+          <Text style={styles.roleLabel}>
+            {language === "uk" ? "Роль доступу" : "Access role"}
+          </Text>
           <View style={styles.roleRow}>
             <Pressable
               onPress={() => setRole("editor")}
               style={[styles.roleBtn, role === "editor" && styles.roleBtnActive]}
             >
-              <Text style={[styles.roleText, role === "editor" && styles.roleTextActive]}>
-                {language === "uk" ? "Співвласник (editor)" : "Co-owner (editor)"}
-              </Text>
+              <View style={styles.roleContent}>
+                <MaterialCommunityIcons
+                  name="account-edit-outline"
+                  size={18}
+                  color={role === "editor" ? Colors.primary : Colors.textSecondary}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.roleText, role === "editor" && styles.roleTextActive]}>
+                    {language === "uk" ? "Співвласник (editor)" : "Co-owner (editor)"}
+                  </Text>
+                  <Text style={[styles.roleHint, role === "editor" && styles.roleHintActive]}>
+                    {language === "uk" ? "Може редагувати дані тварини" : "Can edit pet data"}
+                  </Text>
+                </View>
+                {role === "editor" ? <MaterialCommunityIcons name="check-circle" size={18} color={Colors.primary} /> : null}
+              </View>
             </Pressable>
             <Pressable
               onPress={() => setRole("viewer")}
               style={[styles.roleBtn, role === "viewer" && styles.roleBtnActive]}
             >
-              <Text style={[styles.roleText, role === "viewer" && styles.roleTextActive]}>
-                {language === "uk" ? "Читач (viewer)" : "Reader (viewer)"}
-              </Text>
+              <View style={styles.roleContent}>
+                <MaterialCommunityIcons
+                  name="eye-outline"
+                  size={18}
+                  color={role === "viewer" ? Colors.primary : Colors.textSecondary}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.roleText, role === "viewer" && styles.roleTextActive]}>
+                    {language === "uk" ? "Читач (viewer)" : "Reader (viewer)"}
+                  </Text>
+                  <Text style={[styles.roleHint, role === "viewer" && styles.roleHintActive]}>
+                    {language === "uk" ? "Тільки перегляд без редагування" : "View-only access"}
+                  </Text>
+                </View>
+                {role === "viewer" ? <MaterialCommunityIcons name="check-circle" size={18} color={Colors.primary} /> : null}
+              </View>
             </Pressable>
           </View>
 
@@ -138,7 +169,8 @@ const styles = StyleSheet.create({
     color: Colors.text,
     backgroundColor: Colors.background,
   },
-  roleRow: { gap: 8 },
+  roleLabel: { fontSize: 13, fontFamily: "Inter_600SemiBold", color: Colors.textSecondary, marginTop: 2 },
+  roleRow: { gap: 10 },
   roleBtn: {
     borderWidth: 1,
     borderColor: Colors.border,
@@ -149,10 +181,17 @@ const styles = StyleSheet.create({
   },
   roleBtnActive: {
     borderColor: Colors.primary,
-    backgroundColor: "#EEF4FF",
+    backgroundColor: "#F2F7FF",
+    shadowColor: Colors.primary,
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
   },
-  roleText: { fontSize: 14, fontFamily: "Inter_500Medium", color: Colors.textSecondary },
+  roleContent: { flexDirection: "row", alignItems: "center", gap: 10 },
+  roleText: { fontSize: 15, fontFamily: "Inter_600SemiBold", color: Colors.text },
   roleTextActive: { color: Colors.primary, fontFamily: "Inter_600SemiBold" },
+  roleHint: { fontSize: 12, marginTop: 2, fontFamily: "Inter_400Regular", color: Colors.textSecondary },
+  roleHintActive: { color: Colors.primary },
   submitBtn: {
     marginTop: 4,
     height: 46,
