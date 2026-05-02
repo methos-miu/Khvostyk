@@ -43,11 +43,15 @@ export default function PetShareScreen() {
       .maybeSingle();
 
     if (existingUser?.id) {
+      const { error } = await supabase.rpc("create_pet_user_invitation", {
+        p_pet_id: id,
+        p_invitee_email: normalized,
+        p_role: role,
+      });
       Alert.alert(
-        language === "uk" ? "Наступний етап" : "Next stage",
-        language === "uk"
-          ? "Інвайт для існуючого користувача буде підключено в наступному етапі."
-          : "Existing-user invite flow will be connected in the next stage."
+        error
+          ? (language === "uk" ? "Не вдалося створити запрошення" : "Failed to create invitation")
+          : (language === "uk" ? "Запрошення створено" : "Invitation created")
       );
       return;
     }
