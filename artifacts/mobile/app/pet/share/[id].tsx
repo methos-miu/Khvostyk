@@ -49,33 +49,7 @@ export default function PetShareScreen() {
       return;
     }
 
-    Alert.alert(
-      language === "uk"
-        ? "Користувача не знайдено. Відправити запрошення на email?"
-        : "User not found. Send invitation email?",
-      "",
-      [
-        { text: language === "uk" ? "Ні" : "No", style: "cancel" },
-        {
-          text: language === "uk" ? "Так" : "Yes",
-          onPress: async () => {
-            const { error } = await supabase.functions.invoke("send-pet-invite-email", {
-              body: {
-                petId: id,
-                petName: pet?.name ?? "",
-                inviteeEmail: normalized,
-                role,
-              },
-            });
-            Alert.alert(
-              error
-                ? (language === "uk" ? "Не вдалося відправити email" : "Failed to send email")
-                : (language === "uk" ? "Запрошення відправлено" : "Invitation email sent")
-            );
-          },
-        },
-      ]
-    );
+    Alert.alert(language === "uk" ? "Користувача не знайдено" : "User not found");
   };
 
   return (
