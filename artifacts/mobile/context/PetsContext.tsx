@@ -548,11 +548,36 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
   const syncFromSupabase = async (userId: string) => {
     setIsSyncing(true);
     try {
-      const { data: petsRows, error } = await supabase
+      const { data: ownedPetsRows, error: ownedPetsError } = await supabase
         .from("pets").select("*").eq("owner_id", userId);
-      if (error || !petsRows?.length) { setIsSyncing(false); return; }
+      if (ownedPetsError) { setIsSyncing(false); return; }
 
-      const petIds = petsRows.map(p => p.id);
+      let membershipPetIds: string[] = [];
+      const { data: membershipsRows, error: membershipsError } = await supabase
+        .from("pet_memberships")
+        .select("pet_id")
+        .eq("user_id", userId)
+        .eq("status", "active");
+      if (!membershipsError) {
+        membershipPetIds = (membershipsRows ?? []).map((m: any) => m.pet_id);
+      }
+
+      const ownedPetIds = (ownedPetsRows ?? []).map((p: any) => p.id);
+      const allPetIds = Array.from(new Set([...ownedPetIds, ...membershipPetIds]));
+      if (!allPetIds.length) { setIsSyncing(false); return; }
+
+      const extraPetIds = allPetIds.filter(id => !ownedPetIds.includes(id));
+      let sharedPetsRows: any[] = [];
+      if (extraPetIds.length) {
+        const { data: sharedRows, error: sharedError } = await supabase
+          .from("pets")
+          .select("*")
+          .in("id", extraPetIds);
+        if (!sharedError) sharedPetsRows = sharedRows ?? [];
+      }
+
+      const petsRows = [...(ownedPetsRows ?? []), ...sharedPetsRows];
+      const petIds = petsRows.map((p: any) => p.id);
 
       // Snapshot current local health events using the ref (always fresh, unlike
       // the `pets` closure which is stale on initial mount when pets=[]).
@@ -592,6 +617,12 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
               .createSignedUrl(storagePath, 3600);
             if (signed?.signedUrl) {
               return { ...pet, photoUri: signed.signedUrl };
+            }
+            const { data: publicData } = supabase.storage
+              .from("pet-photos")
+              .getPublicUrl(storagePath);
+            if (publicData?.publicUrl) {
+              return { ...pet, photoUri: publicData.publicUrl };
             }
           }
           return pet;
@@ -698,7 +729,9 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
             role: "owner",
             status: "active",
           }, { onConflict: "pet_id,user_id" });
-          if (membershipError && __DEV__) console.warn("Supabase addPet membership upsert:", membershipError.message);
+          if (membershipError && (membershipError as any)?.code !== "42P01" && __DEV__) {
+            console.warn("Supabase addPet membership upsert:", membershipError.message);
+          }
         }
         if (initWeightEntry) {
           const { error: weightError } = await supabase.from("weight_entries").insert({
