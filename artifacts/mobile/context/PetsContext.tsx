@@ -618,6 +618,12 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
             if (signed?.signedUrl) {
               return { ...pet, photoUri: signed.signedUrl };
             }
+            const { data: publicData } = supabase.storage
+              .from("pet-photos")
+              .getPublicUrl(storagePath);
+            if (publicData?.publicUrl) {
+              return { ...pet, photoUri: publicData.publicUrl };
+            }
           }
           return pet;
         })
