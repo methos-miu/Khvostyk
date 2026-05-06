@@ -1259,7 +1259,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
       if (Object.keys(supabaseUpdate).length === 0) return;
       const { error } = await supabase.from("health_events").update(supabaseUpdate).eq("id", eventId);
-      if (error) console.error("Supabase updateHealthEvent failed:", error.message, "payload:", supabaseUpdate);
+      if (error) {
+        console.error("Supabase updateHealthEvent failed:", error.message, "payload:", supabaseUpdate);
+        throw error;
+      }
     },
     [] // no closure over `pets` — reads petsRef.current at call time instead
   );
