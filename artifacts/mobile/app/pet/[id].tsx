@@ -171,6 +171,15 @@ function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).slice(2, 11);
 }
 
+function resolveSeriesId(event: HealthEvent): string | undefined {
+  if (event.seriesId) return event.seriesId;
+  if (event.id.startsWith("virtual_")) {
+    const parts = event.id.split("_");
+    if (parts.length >= 3) return parts.slice(1, -1).join("_");
+  }
+  return event.id;
+}
+
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
@@ -199,23 +208,14 @@ export default function PetProfileScreen() {
   const [activeDateStr, setActiveDateStr] = useState<string | null>(null);
   const [expandedSlotEventId, setExpandedSlotEventId] = useState<string | null>(null);
   const [slotOverrides, setSlotOverrides] = useState<Record<string, { slots: CycleSlot[]; status: HealthEventStatus }>>({});
+  const [myRole, setMyRole] = useState<"owner" | "editor" | "viewer" | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [memberEmailById, setMemberEmailById] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setSlotOverrides(prev => {
-      const next = { ...prev };
-      let changed = false;
-      for (const eventId of Object.keys(next)) {
-        const event = timelineEvents.find(e => e.id === eventId);
-        if (!event) { delete next[eventId]; changed = true; continue; }
-        const override = next[eventId];
-        const matches = override.slots.every((s, i) =>
-          s.completed_at === event.cycleSlots?.[i]?.completed_at
-        );
-        if (matches) { delete next[eventId]; changed = true; }
-      }
-      return changed ? next : prev;
-    });
-  }, [timelineEvents]);
+    setSlotOverrides(prev => ({ ...prev }));
+  }, [pet?.healthEvents]);
 
   const BLOOD_TYPES = ["A", "B", "AB", "0", "DEA 1.1+", "DEA 1.1-", "DEA 1.2+", "DEA 1.2-", "DEA 3", "DEA 4", "DEA 5", "DEA 7", "A/B"];
 
@@ -258,6 +258,31 @@ export default function PetProfileScreen() {
   ).current;
 
   const pet = getPet(id);
+  useEffect(() => {
+    if (!pet?.id) return;
+    supabase.auth.getUser().then(async ({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      setCurrentUserId(uid);
+      const { data: row } = await supabase.from("pet_memberships").select("role").eq("pet_id", pet.id).eq("user_id", uid).eq("status", "active").maybeSingle();
+      setMyRole((row?.role as any) ?? null);
+      const { data: memberRows } = await supabase.from("pet_memberships").select("user_id").eq("pet_id", pet.id).eq("status", "active");
+      const ids = (memberRows ?? []).map((m: any) => m.user_id);
+      if (ids.length) {
+        const { data: users } = await supabase.from("users").select("id,email").in("id", ids);
+        const map: Record<string, string> = {};
+        (users ?? []).forEach((u: any) => { if (u?.id && u?.email) map[u.id] = u.email; });
+        setMemberEmailById(map);
+      } else {
+        setMemberEmailById({});
+      }
+      const { data: petRow } = await supabase.from("pets").select("owner_id").eq("id", pet.id).maybeSingle();
+      if (petRow?.owner_id) {
+        const { data: owner } = await supabase.from("users").select("email").eq("id", petRow.owner_id).maybeSingle();
+        setOwnerEmail(owner?.email ?? null);
+      }
+    });
+  }, [pet?.id]);
 
   const todayForHandlers = getTodayStr();
 
@@ -340,6 +365,13 @@ export default function PetProfileScreen() {
 
   const handleCompleteSlot = useCallback(async (event: HealthEvent, slotIndex: number) => {
     if (!pet) return;
+    if (myRole === "viewer") {
+      Alert.alert(
+        language === "uk" ? "Лише перегляд" : "Read-only",
+        language === "uk" ? "Для цієї тварини вам доступний тільки перегляд." : "You have read-only access for this pet."
+      );
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const slots = event.cycleSlots ?? [];
@@ -350,7 +382,7 @@ export default function PetProfileScreen() {
       i === slotIndex
         ? s.completed_at
           ? { ...s, completed_at: undefined, completed_by: undefined }
-          : { ...s, completed_at: new Date().toISOString(), completed_by: undefined }
+          : { ...s, completed_at: new Date().toISOString(), completed_by: currentUserId ?? undefined }
         : s
     );
 
@@ -363,6 +395,7 @@ export default function PetProfileScreen() {
       const exceptionEvent: HealthEvent = {
         ...event,
         id: generateId(),
+        seriesId: resolveSeriesId(event),
         isVirtual: undefined,
         isCurrent: false,
         isModified: true,
@@ -446,7 +479,7 @@ export default function PetProfileScreen() {
         language === "uk" ? "Не вдалося оновити" : "Failed to update"
       );
     }
-  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers]);
+  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers, currentUserId, myRole]);
 
   const handleUndoComplete = useCallback((event: HealthEvent) => {
     if (!pet) return;
@@ -532,17 +565,21 @@ export default function PetProfileScreen() {
     const cancelLabel = language === "uk" ? "Скасувати" : "Cancel";
 
     if (Platform.OS === "ios") {
+      const options = myRole === "owner" ? [cancelLabel, editLabel, deleteLabel] : [cancelLabel, editLabel];
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: [cancelLabel, editLabel, deleteLabel], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+        { options, destructiveButtonIndex: myRole === "owner" ? 2 : undefined, cancelButtonIndex: 0 },
         (index) => {
           if (index === 1) router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } });
-          else if (index === 2) confirmDelete();
+          else if (index === 2 && myRole === "owner") confirmDelete();
         }
       );
     } else {
-      Alert.alert(pet?.name ?? "", undefined, [
+      Alert.alert(pet?.name ?? "", undefined, myRole === "owner" ? [
         { text: editLabel, onPress: () => router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } }) },
         { text: deleteLabel, style: "destructive", onPress: confirmDelete },
+        { text: cancelLabel, style: "cancel" },
+      ] : [
+        { text: editLabel, onPress: () => router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } }) },
         { text: cancelLabel, style: "cancel" },
       ]);
     }
@@ -653,6 +690,8 @@ export default function PetProfileScreen() {
             {/* Pet name & subtitle */}
             <View style={styles.coverInfo}>
               <Text style={styles.coverName} numberOfLines={1}>{pet.name}</Text>
+              {myRole ? <Text style={styles.coverRole}>{myRole === "owner" ? (language === "uk" ? "Власник" : "Owner") : myRole === "editor" ? (language === "uk" ? "Співвласник" : "Co-owner") : (language === "uk" ? "Читач" : "Reader")}</Text> : null}
+              {ownerEmail ? <Text style={styles.coverOwnerText}>{language === "uk" ? `Власник: ${ownerEmail}` : `Owner: ${ownerEmail}`}</Text> : null}
               <Text style={styles.coverSubtitle} numberOfLines={1}>
                 {[speciesLabel, pet.breed, age].filter(Boolean).join(" • ")}
               </Text>
@@ -728,6 +767,7 @@ export default function PetProfileScreen() {
                             <Text style={[styles.eventTitle, { fontSize: 13, color: slotDone ? Colors.textTertiary : Colors.text }]} numberOfLines={1}>
                               {slot.slot_name}
                             </Text>
+                            {!!slot.completed_by && <Text numberOfLines={1} style={styles.slotByText}>{language === "uk" ? `✓ ${slot.completed_by === currentUserId ? "Ви" : (memberEmailById[slot.completed_by] ?? "користувач")}` : `✓ by ${slot.completed_by === currentUserId ? "you" : (memberEmailById[slot.completed_by] ?? "user")}`}</Text>}
                             <StatusSquare status={slotStatus} date={event.date} onPress={() => handleCompleteSlot(event, i)} size={20} />
                           </View>
                         );
@@ -1281,6 +1321,23 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
   },
+  coverRole: {
+    alignSelf: "flex-start",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+    backgroundColor: "rgba(0,0,0,0.28)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginBottom: 6,
+  },
+  coverOwnerText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "rgba(255,255,255,0.9)",
+    marginBottom: 4,
+  },
   coverSubtitle: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
@@ -1333,6 +1390,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.text,
   },
+  slotByText: { fontSize: 11, color: Colors.textSecondary, marginRight: 8, flexShrink: 1, maxWidth: 140, textAlign: "right" },
   eventCardEmpty: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",

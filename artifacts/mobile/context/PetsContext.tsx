@@ -676,6 +676,24 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      channel = supabase
+        .channel(`pets-realtime-${uid}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pets" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "pet_memberships" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "health_events" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "weight_entries" }, () => { syncFromSupabase(uid); })
+        .subscribe();
+    });
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
+
   const savePets = async (updated: Pet[]) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -1241,7 +1259,10 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
 
       if (Object.keys(supabaseUpdate).length === 0) return;
       const { error } = await supabase.from("health_events").update(supabaseUpdate).eq("id", eventId);
-      if (error) console.error("Supabase updateHealthEvent failed:", error.message, "payload:", supabaseUpdate);
+      if (error) {
+        console.error("Supabase updateHealthEvent failed:", error.message, "payload:", supabaseUpdate);
+        throw error;
+      }
     },
     [] // no closure over `pets` — reads petsRef.current at call time instead
   );
@@ -1401,37 +1422,54 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       const pet = currentPets.find(p => p.id === petId);
       if (!pet) return;
 
-      const newEvents = [...(pet.healthEvents ?? []), exception];
+      const stableSeriesId = exception.seriesId ?? exception.id;
+      const exceptionKey = exception.recurrenceId ?? exception.date;
+      const existingException = (pet.healthEvents ?? []).find(
+        (e) =>
+          (e.seriesId ?? e.id) === stableSeriesId &&
+          (e.recurrenceId ?? e.date) === exceptionKey
+      );
+      const normalizedException = existingException
+        ? { ...exception, id: existingException.id, seriesId: stableSeriesId }
+        : { ...exception, seriesId: stableSeriesId };
+
+      const newEvents = existingException
+        ? (pet.healthEvents ?? []).map((e) => (e.id === existingException.id ? normalizedException : e))
+        : [...(pet.healthEvents ?? []), normalizedException];
       const updated = currentPets.map(p => p.id === petId ? { ...p, healthEvents: newEvents } : p);
       setPets(updated);
       petsRef.current = updated;
       await savePets(updated);
 
-      supabase.from('health_events').insert({
-        id: exception.id,
+      const { error } = await supabase.from('health_events').upsert({
+        id: normalizedException.id,
         pet_id: petId,
-        type: exception.type,
-        title: exception.title,
-        date: exception.date,
-        status: exception.status,
-        recurrence_type: exception.recurrenceType,
-        series_id: exception.seriesId,
+        type: normalizedException.type,
+        title: normalizedException.title,
+        date: normalizedException.date,
+        status: normalizedException.status,
+        recurrence_type: normalizedException.recurrenceType,
+        series_id: stableSeriesId,
         is_current: false,
         is_modified: true,
         rrule: null,
-        recurrence_id: exception.recurrenceId ?? null,
-        times_per_cycle: exception.timesPerCycle ?? 1,
-        cycle_slots: exception.cycleSlots ?? [],
-        repeat_interval_value: exception.repeatIntervalValue ?? null,
-        repeat_interval_unit: exception.repeatIntervalUnit ?? null,
-        repeat_end_date: exception.repeatEndDate ?? null,
-        notes: exception.notes ?? null,
-        photos: exception.photos ?? [],
-        extra_fields: exception.extraFields ?? {},
-        template_key: exception.templateKey ?? null,
+        recurrence_id: normalizedException.recurrenceId ?? null,
+        times_per_cycle: normalizedException.timesPerCycle ?? 1,
+        cycle_slots: normalizedException.cycleSlots ?? [],
+        repeat_interval_value: normalizedException.repeatIntervalValue ?? null,
+        repeat_interval_unit: normalizedException.repeatIntervalUnit ?? null,
+        repeat_end_date: normalizedException.repeatEndDate ?? null,
+        notes: normalizedException.notes ?? null,
+        photos: normalizedException.photos ?? [],
+        extra_fields: normalizedException.extraFields ?? {},
+        template_key: normalizedException.templateKey ?? null,
         notification_ids: [],
-        created_at: exception.createdAt,
-      }).then(({ error }) => { if (error && __DEV__) console.warn('Supabase addExceptionRecord:', error.message); });
+        created_at: normalizedException.createdAt,
+      }, { onConflict: "series_id,recurrence_id" });
+      if (error) {
+        if (__DEV__) console.warn('Supabase addExceptionRecord:', error.message);
+        throw error;
+      }
     },
     []
   );
@@ -1460,10 +1498,13 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         petsRef.current = updated;
         await savePets(updated);
 
-        supabase.from("health_events")
+        const { error: pastError } = await supabase.from("health_events")
           .update({ status: "done", is_current: false })
-          .eq("id", eventId)
-          .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (past):", error.message); });
+          .eq("id", eventId);
+        if (pastError) {
+          if (__DEV__) console.warn("Supabase markDoneAndAdvance (past):", pastError.message);
+          throw pastError;
+        }
         return;
       }
 
@@ -1512,12 +1553,15 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       petsRef.current = updated;
       await savePets(updated);
 
-      supabase.from("health_events")
+      const { error: doneError } = await supabase.from("health_events")
         .update({ status: "done", is_current: false, cycle_slots: doneEvent.cycleSlots ?? [] })
-        .eq("id", eventId)
-        .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (done):", error.message); });
+        .eq("id", eventId);
+      if (doneError) {
+        if (__DEV__) console.warn("Supabase markDoneAndAdvance (done):", doneError.message);
+        throw doneError;
+      }
 
-      supabase.from("health_events").upsert({
+      const { error: nextError } = await supabase.from("health_events").upsert({
         id: nextEvent.id,
         pet_id: petId,
         type: nextEvent.type,
@@ -1547,8 +1591,11 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         extra_fields: nextEvent.extraFields ?? {},
         template_key: nextEvent.templateKey ?? null,
         created_at: nextEvent.createdAt,
-      }, { onConflict: 'id', ignoreDuplicates: true })
-        .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (next):", error.message); });
+      }, { onConflict: 'id', ignoreDuplicates: true });
+      if (nextError) {
+        if (__DEV__) console.warn("Supabase markDoneAndAdvance (next):", nextError.message);
+        throw nextError;
+      }
     },
     []
   );
