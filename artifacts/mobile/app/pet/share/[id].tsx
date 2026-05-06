@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { Stack } from "expo-router";
@@ -11,6 +11,7 @@ import { supabase } from "@/lib/supabase";
 import { Image } from "expo-image";
 
 type ShareRole = "editor" | "viewer";
+type MemberRow = { user_id: string; role: "owner" | "editor" | "viewer"; status: string; email?: string };
 
 export default function PetShareScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,11 +25,28 @@ export default function PetShareScreen() {
   const [role, setRole] = useState<ShareRole>("viewer");
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [showQr, setShowQr] = useState(false);
+  const [myRole, setMyRole] = useState<"owner" | "editor" | "viewer" | null>(null);
+  const [members, setMembers] = useState<MemberRow[]>([]);
 
   const title = useMemo(
     () => (language === "uk" ? "Спільний доступ" : "Shared Access"),
     [language]
   );
+
+  const loadMembers = async () => {
+    if (!id) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const uid = auth.user?.id;
+    if (!uid) return;
+    const { data: me } = await supabase.from("pet_memberships").select("role").eq("pet_id", id).eq("user_id", uid).eq("status", "active").maybeSingle();
+    setMyRole((me?.role as any) ?? null);
+    const { data: rows } = await supabase.from("pet_memberships").select("user_id,role,status").eq("pet_id", id).eq("status", "active");
+    const userIds = (rows ?? []).map((r: any) => r.user_id);
+    const { data: users } = userIds.length ? await supabase.from("users").select("id,email").in("id", userIds) : { data: [] as any[] };
+    const emails = new Map((users ?? []).map((u: any) => [u.id, u.email]));
+    setMembers((rows ?? []).map((r: any) => ({ ...r, email: emails.get(r.user_id) })));
+  };
+  useEffect(() => { loadMembers(); }, [id]);
 
   const sendInvite = async () => {
     const normalized = email.trim().toLowerCase();
@@ -53,6 +71,7 @@ export default function PetShareScreen() {
           ? (language === "uk" ? "Не вдалося створити запрошення" : "Failed to create invitation")
           : (language === "uk" ? "Запрошення створено" : "Invitation created")
       );
+      await loadMembers();
       return;
     }
 
@@ -75,6 +94,17 @@ export default function PetShareScreen() {
     const generatedQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&data=${encodeURIComponent(deepLink)}`;
     setQrUrl(generatedQrUrl);
     setShowQr(true);
+  };
+  const canManage = myRole === "owner";
+  const updateMemberRole = async (userId: string, nextRole: ShareRole) => {
+    if (!id || !canManage) return;
+    await supabase.from("pet_memberships").update({ role: nextRole }).eq("pet_id", id).eq("user_id", userId);
+    await loadMembers();
+  };
+  const removeMember = async (userId: string) => {
+    if (!id || !canManage) return;
+    await supabase.from("pet_memberships").delete().eq("pet_id", id).eq("user_id", userId);
+    await loadMembers();
   };
 
   return (
@@ -170,6 +200,22 @@ export default function PetShareScreen() {
               {language === "uk" ? "Згенерувати QR" : "Generate QR"}
             </Text>
           </Pressable>
+          <Text style={styles.roleLabel}>{language === "uk" ? "Користувачі з доступом" : "Users with access"}</Text>
+          {members.map((m) => (
+            <View key={m.user_id} style={styles.memberRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memberEmail}>{m.email ?? m.user_id}</Text>
+                <Text style={styles.memberRole}>{m.role}</Text>
+              </View>
+              {canManage && m.role !== "owner" ? (
+                <View style={{ flexDirection: "row", gap: 8 }}>
+                  <Pressable style={styles.smallBtn} onPress={() => updateMemberRole(m.user_id, "editor")}><Text>editor</Text></Pressable>
+                  <Pressable style={styles.smallBtn} onPress={() => updateMemberRole(m.user_id, "viewer")}><Text>viewer</Text></Pressable>
+                  <Pressable style={[styles.smallBtn, { borderColor: Colors.danger }]} onPress={() => removeMember(m.user_id)}><Text style={{ color: Colors.danger }}>✕</Text></Pressable>
+                </View>
+              ) : null}
+            </View>
+          ))}
         </View>
       </ScrollView>
 
@@ -271,6 +317,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#EEF4FF",
   },
   qrBtnText: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.primary },
+  memberRow: { flexDirection: "row", alignItems: "center", gap: 8, borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 10, backgroundColor: Colors.background },
+  memberEmail: { fontSize: 14, fontFamily: "Inter_600SemiBold", color: Colors.text },
+  memberRole: { fontSize: 12, fontFamily: "Inter_400Regular", color: Colors.textSecondary, marginTop: 2 },
+  smallBtn: { borderWidth: 1, borderColor: Colors.border, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 5, backgroundColor: Colors.card },
   qrOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
