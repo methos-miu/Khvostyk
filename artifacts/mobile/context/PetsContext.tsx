@@ -676,6 +676,24 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      channel = supabase
+        .channel(`pets-realtime-${uid}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pets" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "pet_memberships" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "health_events" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "weight_entries" }, () => { syncFromSupabase(uid); })
+        .subscribe();
+    });
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
+
   const savePets = async (updated: Pet[]) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
@@ -1407,7 +1425,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       petsRef.current = updated;
       await savePets(updated);
 
-      supabase.from('health_events').insert({
+      const { error } = await supabase.from('health_events').insert({
         id: exception.id,
         pet_id: petId,
         type: exception.type,
@@ -1431,7 +1449,11 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         template_key: exception.templateKey ?? null,
         notification_ids: [],
         created_at: exception.createdAt,
-      }).then(({ error }) => { if (error && __DEV__) console.warn('Supabase addExceptionRecord:', error.message); });
+      });
+      if (error) {
+        if (__DEV__) console.warn('Supabase addExceptionRecord:', error.message);
+        throw error;
+      }
     },
     []
   );
