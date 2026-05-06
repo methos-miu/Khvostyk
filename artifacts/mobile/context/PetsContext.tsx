@@ -676,6 +676,24 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      channel = supabase
+        .channel(`pets-realtime-${uid}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "pets" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "pet_memberships" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "health_events" }, () => { syncFromSupabase(uid); })
+        .on("postgres_changes", { event: "*", schema: "public", table: "weight_entries" }, () => { syncFromSupabase(uid); })
+        .subscribe();
+    });
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
+  }, []);
+
   const savePets = async (updated: Pet[]) => {
     try {
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
