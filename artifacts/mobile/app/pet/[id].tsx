@@ -453,7 +453,11 @@ export default function PetProfileScreen() {
         return;
       }
 
-      await updateHealthEvent(pet.id, event.id, { cycleSlots: updatedSlots, status: newStatus });
+      await updateHealthEvent(pet.id, event.id, {
+        cycleSlots: updatedSlots,
+        status: newStatus,
+        ...(event.recurrenceType === "regular" ? { isModified: true, recurrenceId: event.date } : {}),
+      });
     } catch (error) {
       console.error('handleCompleteSlot error:', error);
       revert('catch block');
