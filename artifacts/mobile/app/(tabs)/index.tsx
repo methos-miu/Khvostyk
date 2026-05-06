@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -26,13 +26,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { Pet, usePets } from "@/context/PetsContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { supabase } from "@/lib/supabase";
 import { getSpeciesLabel } from "@/utils/speciesLabel";
 import { calculateAge } from "@/utils/notifications";
 import { getAnimalEmoji } from "@/constants/animals";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function PetCard({ pet, index }: { pet: Pet; index: number }) {
+function roleLabel(role: "owner" | "editor" | "viewer" | null, language: string) {
+  if (role === "owner") return language === "uk" ? "Власник" : "Owner";
+  if (role === "editor") return language === "uk" ? "Співвласник" : "Co-owner";
+  return language === "uk" ? "Читач" : "Reader";
+}
+
+function PetCard({ pet, index, role }: { pet: Pet; index: number; role: "owner" | "editor" | "viewer" | null }) {
   const scale = useSharedValue(1);
   const { t, language } = useLanguage();
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -87,6 +94,11 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
             {pet.breed || getSpeciesLabel(pet.species, pet.gender, language, pet.customSpecies)}
           </Text>
           <View style={styles.cardMeta}>
+            {role ? (
+              <View style={styles.rolePill}>
+                <Text style={styles.rolePillText}>{roleLabel(role, language)}</Text>
+              </View>
+            ) : null}
             <View style={styles.agePill}>
               <MaterialCommunityIcons name="clock-outline" size={11} color={Colors.primary} />
               <Text style={styles.agePillText}>{age}</Text>
@@ -115,10 +127,21 @@ function PetCard({ pet, index }: { pet: Pet; index: number }) {
 
 export default function HomeScreen() {
   const { pets, isLoaded, isSyncing } = usePets();
+  const [petRoles, setPetRoles] = useState<Record<string, "owner" | "editor" | "viewer">>({});
   const isLoading = !isLoaded || (isSyncing && pets.length === 0);
   const { t, language } = useLanguage();
   const insets = useSafeAreaInsets();
   const topInset = Platform.OS === "web" ? 67 : insets.top;
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      const { data: rows } = await supabase.from("pet_memberships").select("pet_id,role").eq("user_id", uid).eq("status", "active");
+      const next: Record<string, "owner" | "editor" | "viewer"> = {};
+      (rows ?? []).forEach((r: any) => { next[r.pet_id] = r.role; });
+      setPetRoles(next);
+    });
+  }, [pets.length]);
 
   return (
     <View style={styles.container}>
@@ -192,7 +215,7 @@ export default function HomeScreen() {
         <FlatList
           data={pets}
           keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => <PetCard pet={item} index={index} />}
+          renderItem={({ item, index }) => <PetCard pet={item} index={index} role={petRoles[item.id] ?? null} />}
           contentContainerStyle={[
             styles.listContent,
             { paddingBottom: Platform.OS === "web" ? 100 : 90 },
@@ -326,6 +349,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
+  rolePill: { backgroundColor: "#EEF4FF", borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: "#D6E4FF" },
+  rolePillText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: Colors.primary },
   agePillText: {
     fontSize: 11,
     fontFamily: "Inter_600SemiBold",

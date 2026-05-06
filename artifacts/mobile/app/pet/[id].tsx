@@ -199,23 +199,11 @@ export default function PetProfileScreen() {
   const [activeDateStr, setActiveDateStr] = useState<string | null>(null);
   const [expandedSlotEventId, setExpandedSlotEventId] = useState<string | null>(null);
   const [slotOverrides, setSlotOverrides] = useState<Record<string, { slots: CycleSlot[]; status: HealthEventStatus }>>({});
+  const [myRole, setMyRole] = useState<"owner" | "editor" | "viewer" | null>(null);
 
   useEffect(() => {
-    setSlotOverrides(prev => {
-      const next = { ...prev };
-      let changed = false;
-      for (const eventId of Object.keys(next)) {
-        const event = timelineEvents.find(e => e.id === eventId);
-        if (!event) { delete next[eventId]; changed = true; continue; }
-        const override = next[eventId];
-        const matches = override.slots.every((s, i) =>
-          s.completed_at === event.cycleSlots?.[i]?.completed_at
-        );
-        if (matches) { delete next[eventId]; changed = true; }
-      }
-      return changed ? next : prev;
-    });
-  }, [timelineEvents]);
+    setSlotOverrides(prev => ({ ...prev }));
+  }, [pet?.healthEvents]);
 
   const BLOOD_TYPES = ["A", "B", "AB", "0", "DEA 1.1+", "DEA 1.1-", "DEA 1.2+", "DEA 1.2-", "DEA 3", "DEA 4", "DEA 5", "DEA 7", "A/B"];
 
@@ -258,6 +246,15 @@ export default function PetProfileScreen() {
   ).current;
 
   const pet = getPet(id);
+  useEffect(() => {
+    if (!pet?.id) return;
+    supabase.auth.getUser().then(async ({ data }) => {
+      const uid = data.user?.id;
+      if (!uid) return;
+      const { data: row } = await supabase.from("pet_memberships").select("role").eq("pet_id", pet.id).eq("user_id", uid).eq("status", "active").maybeSingle();
+      setMyRole((row?.role as any) ?? null);
+    });
+  }, [pet?.id]);
 
   const todayForHandlers = getTodayStr();
 
@@ -532,17 +529,21 @@ export default function PetProfileScreen() {
     const cancelLabel = language === "uk" ? "Скасувати" : "Cancel";
 
     if (Platform.OS === "ios") {
+      const options = myRole === "owner" ? [cancelLabel, editLabel, deleteLabel] : [cancelLabel, editLabel];
       ActionSheetIOS.showActionSheetWithOptions(
-        { options: [cancelLabel, editLabel, deleteLabel], destructiveButtonIndex: 2, cancelButtonIndex: 0 },
+        { options, destructiveButtonIndex: myRole === "owner" ? 2 : undefined, cancelButtonIndex: 0 },
         (index) => {
           if (index === 1) router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } });
-          else if (index === 2) confirmDelete();
+          else if (index === 2 && myRole === "owner") confirmDelete();
         }
       );
     } else {
-      Alert.alert(pet?.name ?? "", undefined, [
+      Alert.alert(pet?.name ?? "", undefined, myRole === "owner" ? [
         { text: editLabel, onPress: () => router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } }) },
         { text: deleteLabel, style: "destructive", onPress: confirmDelete },
+        { text: cancelLabel, style: "cancel" },
+      ] : [
+        { text: editLabel, onPress: () => router.push({ pathname: "/pet/edit/[id]", params: { id: pet!.id } }) },
         { text: cancelLabel, style: "cancel" },
       ]);
     }
@@ -653,6 +654,7 @@ export default function PetProfileScreen() {
             {/* Pet name & subtitle */}
             <View style={styles.coverInfo}>
               <Text style={styles.coverName} numberOfLines={1}>{pet.name}</Text>
+              {myRole ? <Text style={styles.coverRole}>{myRole === "owner" ? (language === "uk" ? "Власник" : "Owner") : myRole === "editor" ? (language === "uk" ? "Співвласник" : "Co-owner") : (language === "uk" ? "Читач" : "Reader")}</Text> : null}
               <Text style={styles.coverSubtitle} numberOfLines={1}>
                 {[speciesLabel, pet.breed, age].filter(Boolean).join(" • ")}
               </Text>
@@ -1280,6 +1282,17 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(0,0,0,0.4)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  coverRole: {
+    alignSelf: "flex-start",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#fff",
+    backgroundColor: "rgba(0,0,0,0.28)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    marginBottom: 6,
   },
   coverSubtitle: {
     fontSize: 14,
