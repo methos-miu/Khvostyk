@@ -202,6 +202,7 @@ export default function PetProfileScreen() {
   const [myRole, setMyRole] = useState<"owner" | "editor" | "viewer" | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [memberEmailById, setMemberEmailById] = useState<Record<string, string>>({});
 
   useEffect(() => {
     setSlotOverrides(prev => ({ ...prev }));
@@ -256,6 +257,16 @@ export default function PetProfileScreen() {
       setCurrentUserId(uid);
       const { data: row } = await supabase.from("pet_memberships").select("role").eq("pet_id", pet.id).eq("user_id", uid).eq("status", "active").maybeSingle();
       setMyRole((row?.role as any) ?? null);
+      const { data: memberRows } = await supabase.from("pet_memberships").select("user_id").eq("pet_id", pet.id).eq("status", "active");
+      const ids = (memberRows ?? []).map((m: any) => m.user_id);
+      if (ids.length) {
+        const { data: users } = await supabase.from("users").select("id,email").in("id", ids);
+        const map: Record<string, string> = {};
+        (users ?? []).forEach((u: any) => { if (u?.id && u?.email) map[u.id] = u.email; });
+        setMemberEmailById(map);
+      } else {
+        setMemberEmailById({});
+      }
       const { data: petRow } = await supabase.from("pets").select("owner_id").eq("id", pet.id).maybeSingle();
       if (petRow?.owner_id) {
         const { data: owner } = await supabase.from("users").select("email").eq("id", petRow.owner_id).maybeSingle();
@@ -739,7 +750,7 @@ export default function PetProfileScreen() {
                             <Text style={[styles.eventTitle, { fontSize: 13, color: slotDone ? Colors.textTertiary : Colors.text }]} numberOfLines={1}>
                               {slot.slot_name}
                             </Text>
-                            {!!slot.completed_by && <Text style={styles.slotByText}>{language === "uk" ? `✓ ${slot.completed_by === currentUserId ? "Ви" : slot.completed_by}` : `✓ by ${slot.completed_by === currentUserId ? "you" : slot.completed_by}`}</Text>}
+                            {!!slot.completed_by && <Text numberOfLines={1} style={styles.slotByText}>{language === "uk" ? `✓ ${slot.completed_by === currentUserId ? "Ви" : (memberEmailById[slot.completed_by] ?? "користувач")}` : `✓ by ${slot.completed_by === currentUserId ? "you" : (memberEmailById[slot.completed_by] ?? "user")}`}</Text>}
                             <StatusSquare status={slotStatus} date={event.date} onPress={() => handleCompleteSlot(event, i)} size={20} />
                           </View>
                         );
@@ -1362,7 +1373,7 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     color: Colors.text,
   },
-  slotByText: { fontSize: 11, color: Colors.textSecondary, marginRight: 8 },
+  slotByText: { fontSize: 11, color: Colors.textSecondary, marginRight: 8, flexShrink: 1, maxWidth: 140, textAlign: "right" },
   eventCardEmpty: {
     fontSize: 14,
     fontFamily: "Inter_400Regular",
