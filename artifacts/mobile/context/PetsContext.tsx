@@ -1495,10 +1495,13 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         petsRef.current = updated;
         await savePets(updated);
 
-        supabase.from("health_events")
+        const { error: pastError } = await supabase.from("health_events")
           .update({ status: "done", is_current: false })
-          .eq("id", eventId)
-          .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (past):", error.message); });
+          .eq("id", eventId);
+        if (pastError) {
+          if (__DEV__) console.warn("Supabase markDoneAndAdvance (past):", pastError.message);
+          throw pastError;
+        }
         return;
       }
 
@@ -1547,12 +1550,15 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       petsRef.current = updated;
       await savePets(updated);
 
-      supabase.from("health_events")
+      const { error: doneError } = await supabase.from("health_events")
         .update({ status: "done", is_current: false, cycle_slots: doneEvent.cycleSlots ?? [] })
-        .eq("id", eventId)
-        .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (done):", error.message); });
+        .eq("id", eventId);
+      if (doneError) {
+        if (__DEV__) console.warn("Supabase markDoneAndAdvance (done):", doneError.message);
+        throw doneError;
+      }
 
-      supabase.from("health_events").upsert({
+      const { error: nextError } = await supabase.from("health_events").upsert({
         id: nextEvent.id,
         pet_id: petId,
         type: nextEvent.type,
@@ -1582,8 +1588,11 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         extra_fields: nextEvent.extraFields ?? {},
         template_key: nextEvent.templateKey ?? null,
         created_at: nextEvent.createdAt,
-      }, { onConflict: 'id', ignoreDuplicates: true })
-        .then(({ error }) => { if (error && __DEV__) console.warn("Supabase markDoneAndAdvance (next):", error.message); });
+      }, { onConflict: 'id', ignoreDuplicates: true });
+      if (nextError) {
+        if (__DEV__) console.warn("Supabase markDoneAndAdvance (next):", nextError.message);
+        throw nextError;
+      }
     },
     []
   );
