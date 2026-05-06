@@ -1425,7 +1425,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       petsRef.current = updated;
       await savePets(updated);
 
-      supabase.from('health_events').insert({
+      const { error } = await supabase.from('health_events').insert({
         id: exception.id,
         pet_id: petId,
         type: exception.type,
@@ -1449,7 +1449,11 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         template_key: exception.templateKey ?? null,
         notification_ids: [],
         created_at: exception.createdAt,
-      }).then(({ error }) => { if (error && __DEV__) console.warn('Supabase addExceptionRecord:', error.message); });
+      });
+      if (error) {
+        if (__DEV__) console.warn('Supabase addExceptionRecord:', error.message);
+        throw error;
+      }
     },
     []
   );
