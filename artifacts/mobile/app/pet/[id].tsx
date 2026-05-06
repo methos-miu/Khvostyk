@@ -171,6 +171,15 @@ function generateId(): string {
   return Date.now().toString() + Math.random().toString(36).slice(2, 11);
 }
 
+function resolveSeriesId(event: HealthEvent): string | undefined {
+  if (event.seriesId) return event.seriesId;
+  if (event.id.startsWith("virtual_")) {
+    const parts = event.id.split("_");
+    if (parts.length >= 3) return parts.slice(1, -1).join("_");
+  }
+  return event.id;
+}
+
 export default function PetProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const {
@@ -386,7 +395,7 @@ export default function PetProfileScreen() {
       const exceptionEvent: HealthEvent = {
         ...event,
         id: generateId(),
-        seriesId: event.seriesId ?? event.id,
+        seriesId: resolveSeriesId(event),
         isVirtual: undefined,
         isCurrent: false,
         isModified: true,
