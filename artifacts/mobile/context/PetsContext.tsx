@@ -1419,13 +1419,16 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
       const pet = currentPets.find(p => p.id === petId);
       if (!pet) return;
 
+      const stableSeriesId = exception.seriesId ?? exception.id;
       const exceptionKey = exception.recurrenceId ?? exception.date;
       const existingException = (pet.healthEvents ?? []).find(
         (e) =>
-          e.seriesId === exception.seriesId &&
+          (e.seriesId ?? e.id) === stableSeriesId &&
           (e.recurrenceId ?? e.date) === exceptionKey
       );
-      const normalizedException = existingException ? { ...exception, id: existingException.id } : exception;
+      const normalizedException = existingException
+        ? { ...exception, id: existingException.id, seriesId: stableSeriesId }
+        : { ...exception, seriesId: stableSeriesId };
 
       const newEvents = existingException
         ? (pet.healthEvents ?? []).map((e) => (e.id === existingException.id ? normalizedException : e))
@@ -1443,7 +1446,7 @@ export function PetsProvider({ children }: { children: React.ReactNode }) {
         date: normalizedException.date,
         status: normalizedException.status,
         recurrence_type: normalizedException.recurrenceType,
-        series_id: normalizedException.seriesId,
+        series_id: stableSeriesId,
         is_current: false,
         is_modified: true,
         rrule: null,

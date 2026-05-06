@@ -356,6 +356,13 @@ export default function PetProfileScreen() {
 
   const handleCompleteSlot = useCallback(async (event: HealthEvent, slotIndex: number) => {
     if (!pet) return;
+    if (myRole === "viewer") {
+      Alert.alert(
+        language === "uk" ? "Лише перегляд" : "Read-only",
+        language === "uk" ? "Для цієї тварини вам доступний тільки перегляд." : "You have read-only access for this pet."
+      );
+      return;
+    }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const slots = event.cycleSlots ?? [];
@@ -379,6 +386,7 @@ export default function PetProfileScreen() {
       const exceptionEvent: HealthEvent = {
         ...event,
         id: generateId(),
+        seriesId: event.seriesId ?? event.id,
         isVirtual: undefined,
         isCurrent: false,
         isModified: true,
@@ -466,7 +474,7 @@ export default function PetProfileScreen() {
         language === "uk" ? "Не вдалося оновити" : "Failed to update"
       );
     }
-  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers, currentUserId]);
+  }, [pet, updateHealthEvent, markDoneAndAdvance, deleteHealthEvent, addExceptionRecord, language, todayForHandlers, currentUserId, myRole]);
 
   const handleUndoComplete = useCallback((event: HealthEvent) => {
     if (!pet) return;
